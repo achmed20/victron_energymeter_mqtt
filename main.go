@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -241,71 +242,70 @@ func main() {
 	victronValues[1]["/Ac/L2/Energy/Reverse"] = dbus.MakeVariant("0 kWh")
 	victronValues[0]["/Ac/L3/Energy/Reverse"] = dbus.MakeVariant(0.0)
 	victronValues[1]["/Ac/L3/Energy/Reverse"] = dbus.MakeVariant("0 kWh")
-	/*
 
-		basicPaths := []dbus.ObjectPath{
-			"/Connected",
-			"/CustomName",
-			"/DeviceInstance",
-			"/DeviceType",
-			"/ErrorCode",
-			"/FirmwareVersion",
-			"/Mgmt/Connection",
-			"/Mgmt/ProcessName",
-			"/Mgmt/ProcessVersion",
-			"/Position",
-			"/ProductId",
-			"/ProductName",
-			"/Serial",
-		}
+	basicPaths := []dbus.ObjectPath{
+		"/Connected",
+		"/CustomName",
+		"/DeviceInstance",
+		"/DeviceType",
+		"/ErrorCode",
+		"/FirmwareVersion",
+		"/Mgmt/Connection",
+		"/Mgmt/ProcessName",
+		"/Mgmt/ProcessVersion",
+		"/Position",
+		"/ProductId",
+		"/ProductName",
+		"/Serial",
+	}
 
-		updatingPaths := []dbus.ObjectPath{
-			"/Ac/L1/Power",
-			"/Ac/L2/Power",
-			"/Ac/L3/Power",
-			"/Ac/L1/Voltage",
-			"/Ac/L2/Voltage",
-			"/Ac/L3/Voltage",
-			"/Ac/L1/Current",
-			"/Ac/L2/Current",
-			"/Ac/L3/Current",
-			"/Ac/L1/Energy/Forward",
-			"/Ac/L2/Energy/Forward",
-			"/Ac/L3/Energy/Forward",
-			"/Ac/L1/Energy/Reverse",
-			"/Ac/L2/Energy/Reverse",
-			"/Ac/L3/Energy/Reverse",
-		}
+	updatingPaths := []dbus.ObjectPath{
+		"/Ac/L1/Power",
+		"/Ac/L2/Power",
+		"/Ac/L3/Power",
+		"/Ac/L1/Voltage",
+		"/Ac/L2/Voltage",
+		"/Ac/L3/Voltage",
+		"/Ac/L1/Current",
+		"/Ac/L2/Current",
+		"/Ac/L3/Current",
+		"/Ac/L1/Energy/Forward",
+		"/Ac/L2/Energy/Forward",
+		"/Ac/L3/Energy/Forward",
+		"/Ac/L1/Energy/Reverse",
+		"/Ac/L2/Energy/Reverse",
+		"/Ac/L3/Energy/Reverse",
+	}
 
-		defer conn.Close()
-			// Some of the victron stuff requires it be called grid.cgwacs... using the only known valid value (from the simulator)
-			// This can _probably_ be changed as long as it matches com.victronenergy.grid.cgwacs_*
-			reply, err := conn.RequestName("com.victronenergy.grid.cgwacs_ttyUSB0_di30_mb1",
-				dbus.NameFlagDoNotQueue)
-			if err != nil {
-				log.Panic("Something went horribly wrong in the dbus connection")
-				panic(err)
-			}
+	defer conn.Close()
+	// Some of the victron stuff requires it be called grid.cgwacs... using the only known valid value (from the simulator)
+	// This can _probably_ be changed as long as it matches com.victronenergy.grid.cgwacs_*
+	reply, err := conn.RequestName("com.victronenergy.grid.cgwacs_ttyUSB0_di30_mb1",
+		dbus.NameFlagDoNotQueue)
+	if err != nil {
+		log.Panic("Something went horribly wrong in the dbus connection")
+		panic(err)
+	}
 
-			if reply != dbus.RequestNameReplyPrimaryOwner {
-				log.Panic("name cgwacs_ttyUSB0_di30_mb1 already taken on dbus.")
-				os.Exit(1)
-			}
+	if reply != dbus.RequestNameReplyPrimaryOwner {
+		log.Panic("name cgwacs_ttyUSB0_di30_mb1 already taken on dbus.")
+		os.Exit(1)
+	}
 
-			for i, s := range basicPaths {
-				log.Debug("Registering dbus basic path #", i, ": ", s)
-				conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
-				conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
-			}
+	for i, s := range basicPaths {
+		log.Debug("Registering dbus basic path #", i, ": ", s)
+		conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
+		conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
+	}
 
-			for i, s := range updatingPaths {
-				log.Debug("Registering dbus update path #", i, ": ", s)
-				conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
-				conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
-			}
+	for i, s := range updatingPaths {
+		log.Debug("Registering dbus update path #", i, ": ", s)
+		conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
+		conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
+	}
 
-			log.Info("Successfully connected to dbus and registered as a meter... Commencing reading of the SDM630 meter")
-	*/
+	log.Info("Successfully connected to dbus and registered as a meter... Commencing reading of the SDM630 meter")
+
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", BROKER, PORT))
@@ -345,9 +345,8 @@ func updateVariant(value float64, unit string, path string) {
 	emit["Value"] = dbus.MakeVariant(float64(value))
 	victronValues[0][objectpath(path)] = emit["Value"]
 	victronValues[1][objectpath(path)] = emit["Text"]
-	//TODO: wieder an
 	log.WithFields(log.Fields{"path": path, "unit": unit, "value": value}).Debug("new dbus value")
-	// conn.Emit(dbus.ObjectPath(path), "com.victronenergy.BusItem.PropertiesChanged", emit)
+	conn.Emit(dbus.ObjectPath(path), "com.victronenergy.BusItem.PropertiesChanged", emit)
 }
 
 /* Convert binary to float64 */
