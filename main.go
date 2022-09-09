@@ -75,16 +75,15 @@ func (f objectpath) GetText() (string, *dbus.Error) {
 }
 
 func init() {
-	log.SetFormatter(&log.TextFormatter{
-		ForceColors: true,
-	})
+	log.SetFormatter(&log.TextFormatter{})
 
-	viper.SetConfigName("config")                  // name of config file (without extension)
-	viper.SetConfigType("yaml")                    // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("/etc/victron_em_config/") // path to look for the config file in
-	viper.AddConfigPath(".")                       // optionally look for config in the working directory
-	err := viper.ReadInConfig()                    // Find and read the config file
-	if err != nil {                                // Handle errors reading the config file
+	viper.SetConfigName("victron-mqtt-emm") // name of config file (without extension)
+	viper.SetConfigType("yaml")             // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/etc")             // path to look for the config file in
+	viper.AddConfigPath("/data")            // optionally look for config in the working directory
+	viper.AddConfigPath(".")                // optionally look for config in the working directory
+	err := viper.ReadInConfig()             // Find and read the config file
+	if err != nil {                         // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
@@ -438,6 +437,9 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		var tKw float64
 		var tImported float64
 		var tExported float64
+		var emptyCurrent bool
+		var emptyPower bool
+
 		for key := 0; key < len(phase.Lines); key++ {
 
 			v := &phase.Lines[key]
@@ -449,10 +451,12 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 			if v.Power != 0 && v.Current == 0 {
 				log.Debug("current missing, calculating value")
 				v.Current = v.Power / v.Voltage
+				emptyCurrent = true
 			}
 			if v.Current != 0 && v.Power == 0 {
 				log.Debug("power missing, calculating value")
 				v.Power = v.Voltage * v.Current
+				emptyPower = true
 			}
 
 			updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
@@ -473,6 +477,12 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 				"Exported": v.Exported,
 				"Imported": v.Imported,
 			}).Info("New values for " + v.Name)
+			if emptyCurrent {
+				v.Current = 0
+			}
+			if emptyPower {
+				v.Power = 0
+			}
 		}
 
 		updateVariant(tKw, "W", "/Ac/Power")
