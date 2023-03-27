@@ -19,6 +19,7 @@ The goal was to make a MQTT bridge which supports all sorts of EM meters as long
 You need to change the default values in the `victron-mqtt-bridge.yaml` file:
 ```yaml
 loglevel: trace                         #loglevels are: "info,warn,debug,trace", remove to disable logging
+loginterval: 3600                       #time in secods to write periodic logs. default: 3600
 #dryrun: true                           #disables dbus connection, for testing only
 client_id: "victron-3em-bridge"         #Name inside Victron
 

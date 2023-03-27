@@ -1,31 +1,34 @@
-loglevel: info #loglevels are: "info,warn,debug,trace", remove to disable logging
-# dryrun: true #disables dbus connection, for testing only
-client_id: "victron-3em-bridge"
+loglevel: trace                         #loglevels are: "info,warn,debug,trace", remove to disable logging
+loginterval: 3600                       #time in secods to write periodic logs. default: 3600
+#dryrun: true                           #disables dbus connection, for testing only
+client_id: "victron-3em-bridge"         #Name inside Victron
 
-#mqtt config
+#mqtt config, most likley the only thing you need to change
 broker: 192.168.12.200
 port: 1883
 user: 
 password: 
-topic: shellies/3em/emeter/#
+topic: shellies/3em/emeter/#            #base topic. the "#" will subscribe to ALL topics beneath it
 
-phases: 3 #amount of phases, required
+phases: 3                               #amount of phases, required
 
+# Required, if if you 
 L1:
-  #default values if some topic is missing
+  #default values in case some topic is missing
   voltage: 230.0
   current: 0.0
   power: 0.0
   imported: 0.0
   exported: 0.0
-  #relative from topic, just write "something" is unassigned
+  #relative path from topic, just write "something" if it's unassigned
   topic:
-    Power: 0/power 
-    Voltage: 0/voltage
+    Power: 0/power                      #will result in 'shellies/3em/emeter/0/power'   
+    Voltage: 0/voltage                  #...
     Current: 0/current
     Imported: 0/total
     Exported: 0/total_returned
 
+#Remove if you only have 1 phase to track
 L2:
   voltage: 230.0
   current: 0.0
@@ -39,6 +42,7 @@ L2:
     Imported: 1/total
     Exported: 1/total_returned
 
+#Remove if you only have 1 phase to track
 L3:
   voltage: 230.0
   current: 0.0
@@ -51,4 +55,3 @@ L3:
     Current: 2/current
     Imported: 2/total
     Exported: 2/total_returned
-

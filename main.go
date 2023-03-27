@@ -36,6 +36,8 @@ var psum_update bool = true
 var value_correction bool = false
 var conn, err = dbus.SystemBus()
 var dryrun bool
+var totalMessages uint32
+var logInterval int32
 
 const intro = `
 <node>
@@ -134,6 +136,11 @@ func init() {
 	default:
 		log.SetOutput(ioutil.Discard)
 	}
+	logInterval = viper.GetInt32("loginterval")
+	if logInterval == 0 {
+		logInterval = 3600
+	}
+	log.Info(fmt.Sprintf("log interval set to %d", logInterval))
 
 	// -------- setup phases -----------
 	lineName := "l1"
@@ -176,6 +183,48 @@ func init() {
 }
 
 func main() {
+	connectDbus()
+
+	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'... Commencing reading Starting MQTT")
+
+	// MQTT Subscripte
+	opts := mqtt.NewClientOptions()
+	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", BROKER, PORT))
+	opts.SetClientID(CLIENT_ID)
+	opts.SetUsername(USERNAME)
+	opts.SetPassword(PASSWORD)
+	opts.SetDefaultPublishHandler(messagePubHandler) //func that handles all messages
+	opts.OnConnect = connectHandler
+	opts.OnConnectionLost = connectLostHandler
+	client := mqtt.NewClient(opts)
+	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		log.WithField("error", token.Error()).Panic("could not connect to MQTT server")
+	}
+	sub(client)
+	// Infinite loop
+	for true {
+		//fmt.Println("Infinite Loop entered")
+		log.WithField("messages", totalMessages).Info("MQTT messages processed")
+		totalMessages = 0
+		time.Sleep(time.Second * time.Duration(logInterval))
+	}
+
+	// This is a forever loop^^
+	panic("Error: We terminated.... how did we ever get here?")
+}
+
+// -----------------------------------------------------------------
+
+/* MQTT Subscribe Function */
+func sub(client mqtt.Client) {
+	topic := TOPIC
+	token := client.Subscribe(topic, 1, nil)
+	token.Wait()
+	log.Info("Subscribed to topic: " + topic)
+}
+
+/* connect to DBUS */
+func connectDbus() {
 	// Need to implement following paths:
 	// https://github.com/victronenergy/venus/wiki/dbus#grid-meter
 	// also in system.py
@@ -333,38 +382,6 @@ func main() {
 		}
 	}
 
-	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'... Commencing reading Starting MQTT")
-
-	// MQTT Subscripte
-	opts := mqtt.NewClientOptions()
-	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", BROKER, PORT))
-	opts.SetClientID(CLIENT_ID)
-	opts.SetUsername(USERNAME)
-	opts.SetPassword(PASSWORD)
-	opts.SetDefaultPublishHandler(messagePubHandler)
-	opts.OnConnect = connectHandler
-	opts.OnConnectionLost = connectLostHandler
-	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.WithField("error", token.Error()).Panic("could not connect to MQTT server")
-	}
-	sub(client)
-	// Infinite loop
-	for true {
-		//fmt.Println("Infinite Loop entered")
-		time.Sleep(time.Second)
-	}
-
-	// This is a forever loop^^
-	panic("Error: We terminated.... how did we ever get here?")
-}
-
-/* MQTT Subscribe Function */
-func sub(client mqtt.Client) {
-	topic := TOPIC
-	token := client.Subscribe(topic, 1, nil)
-	token.Wait()
-	log.Info("Subscribed to topic: " + topic)
 }
 
 /* Write dbus Values to Victron handler */
@@ -401,7 +418,8 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 
 /* Called if connection is lost  */
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	log.Info(fmt.Sprintf("Connect lost: %v", err))
+	//panic and let the script restart
+	log.Panic(fmt.Sprintf("Connect lost: %v", err))
 }
 
 /* Search for string with regex */
@@ -462,6 +480,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 	}
 
 	if foundSomething {
+		totalMessages++
 		var tKw float64
 		var tImported float64
 		var tExported float64
