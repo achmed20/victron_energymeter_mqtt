@@ -513,9 +513,9 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 
 		}
 
-		// updateVariant(tKw, "W", "/Ac/Power")
-		// updateVariant(tExported, "kWh", "/Ac/Energy/Forward")
-		// updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
+		updateVariant(tKw, "W", "/Ac/Power")
+		updateVariant(tExported, "kWh", "/Ac/Energy/Forward")
+		updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
 	}
 
 }
