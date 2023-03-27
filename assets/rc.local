@@ -1,2 +1,2 @@
 #!/bin/bash
-/data/home/victron-mqtt-bridge > /dev/null 2>/dev/null &
+sleep 20 && /data/victron-mqtt-bridge.sh > /data/victron-mqtt-bridge.log 2>&1 &

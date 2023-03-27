@@ -1,6 +1,9 @@
 # Victron MQTT bridge 
 
-This is a fork of Fabians Lauer shelly smartmeter bridge but made MQTT based.( [Original repo](https://github.com/fabian-lauer/dbus-shelly-3em-smartmeter) )
+This work is based on 2 repos.
+
+* Python implementation of [Fabian Lauer](https://github.com/fabian-lauer/dbus-shelly-3em-smartmeter)
+* Golang implementation of [stormmurdoc](https://github.com/stormmurdoc/victron_sdm630_bridge)
 
 The goal was to make a MQTT bridge which supports all sorts of EM meters as long long as they store their data in an MQTT server and add a YAML file for configuring it.
 
@@ -85,5 +88,3 @@ if you Venus device happens to be named `einstein`, you can use this command to 
 ```sh
 make copy
 ```
-
-
