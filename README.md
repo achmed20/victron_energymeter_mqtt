@@ -7,9 +7,14 @@ This work is based on 2 repos.
 
 The goal was to make a MQTT bridge which supports all sorts of EM meters as long long as they store their data in an MQTT server and add a YAML file for configuring it.
 
-# Configuration
+## Features
+* Can use any MQTT topic as long as the subtopics are no JSON objects.
+* Will work with one phase only. L2 and L3 will just be left with default values which is still enough for the Victron.
+* Will work with only Power as input! I had a SML reader before and its only output was power, which is enough to calculate the missing values.
+  - Autogenerates `current` based on `power` and `voltage`
+  - able to set default for Voltage in case its missing
 
-## Change Default Configuration
+# Configuration
 
 You need to change the default values in the `victron-mqtt-bridge.yaml` file:
 ```yaml
@@ -26,6 +31,7 @@ topic: shellies/3em/emeter/#            #base topic. the "#" will subscribe to A
 
 phases: 3                               #amount of phases, required
 
+# Required, if if you 
 L1:
   #default values in case some topic is missing
   voltage: 230.0
@@ -41,6 +47,7 @@ L1:
     Imported: 0/total
     Exported: 0/total_returned
 
+#Remove if you only have 1 phase to track
 L2:
   voltage: 230.0
   current: 0.0
@@ -54,6 +61,7 @@ L2:
     Imported: 1/total
     Exported: 1/total_returned
 
+#Remove if you only have 1 phase to track
 L3:
   voltage: 230.0
   current: 0.0
