@@ -1,3 +1,2 @@
-*.pdf
-bin/*
 .build
+*.zip
