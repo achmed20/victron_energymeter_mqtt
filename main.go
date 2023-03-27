@@ -184,9 +184,7 @@ func init() {
 
 func main() {
 	connectDbus()
-
-	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'... Commencing reading Starting MQTT")
-
+	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'")
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", BROKER, PORT))

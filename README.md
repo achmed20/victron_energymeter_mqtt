@@ -8,11 +8,24 @@ This work is based on 2 repos.
 The goal was to make a MQTT bridge which supports all sorts of EM meters as long long as they store their data in an MQTT server and add a YAML file for configuring it.
 
 ## Features
-* Can use any MQTT topic as long as the subtopics are no JSON objects.
+* Golang executeable which should be way faster and easier to setup
+* Reactive rather then proactive
+* Use any MQTT topic as long as the subtopics are no JSON objects.
 * Will work with one phase only. L2 and L3 will just be left with default values which is still enough for the Victron.
 * Will work with only Power as input! I had a SML reader before and its only output was power, which is enough to calculate the missing values.
   - Autogenerates `current` based on `power` and `voltage`
   - able to set default for Voltage in case its missing
+
+```sh
+$# ./victron-mqtt-bridge
+INFO[2023-03-27T15:53:46] Successfully connected to dbus and registered as a 'victron-mqtt-bridge' 
+INFO[2023-03-27T15:53:46] Connected to broker 192.168.0.100:1883      
+INFO[2023-03-27T15:53:46] Subscribed to topic: shellies/3em/emeter/#   
+INFO[2023-03-27T15:53:46] MQTT messages processed                       messages=0
+INFO[2023-03-27T16:53:51] MQTT messages processed                       messages=1530
+INFO[2023-03-27T17:53:56] MQTT messages processed                       messages=3115
+...
+```
 
 # Configuration
 
