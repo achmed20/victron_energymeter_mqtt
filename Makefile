@@ -9,5 +9,8 @@ build:
 	cp bin/main-linux-arm/victron-mqtt-bridge .build
 	cp ./assets/* .build
 
+release:
+	zip -FSrj build.zip ./.build/* README.md
+
 copy:
 	scp .build/* root@einstein:/data
