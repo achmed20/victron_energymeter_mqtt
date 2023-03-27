@@ -76,23 +76,42 @@ L3:
     Exported: 2/total_returned
 ```
 
+# Installing
+
+1. Download and extract `build.zip`
+2. Change the `victron-mqtt-bridge.yaml`. 
+3. Copy contents over to your device by hand (into the `/data` folder)
+4. Restart your GX device
+
 ## Compiling from source
 
-To compile this for the Venus GX (an Arm 7 processor), you can easily cross-compile with the following:
+Compile it with
 ```sh
 make build
 ```
-This will create a `.build` fodler with all the filey you need
+This will create a `.build` folder with all the files you need
 
-After Compiling, make sure to to change the config under `.build/victron-mqtt-bridge.yaml`
+# Troubleshooting
 
-## Installing
+* make sure your MQTT server is correct
+* make sure your topics are correct
+* take a look at the logfile under `/data/victron-mqtt-bridge.log` for startup errors
 
-copy contents of `.build` over to your device by hand (into the `/data` folder)
+# Basic debugging
 
-or
+start `/data/victron-mqtt-bridge` by hand. and look for errors
 
-if you Venus device happens to be named `einstein`, you can use this command to copy the files over
-```sh
-make copy
+## Advanced debugging
+
+Try changing the loglevel to trace in `/data/victron-mqtt-bridge.yaml`
+```yaml
+loglevel: trace
+```
+**make sure to set it back to `info` once your problem is solved**
+
+### Values dont change?
+Search the output for 'found matching topic'! If you dont have those, its likely that either your main `topic` or the topics of `L1-L3` are wrong
+```
+TRAC[2023-03-27T14:44:06+02:00] Received message: 200.28 from topic: shellies/3em/emeter/2/power 
+TRAC[2023-03-27T14:44:06+02:00] found matching topic for Power                payload=200.28 phase=L3 topic=2/power
 ```
