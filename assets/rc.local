@@ -1,0 +1,2 @@
+#!/bin/bash
+/data/home/victron-mqtt-bridge > /dev/null 2>/dev/null &

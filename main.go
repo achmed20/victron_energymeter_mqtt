@@ -82,13 +82,13 @@ func init() {
 		FullTimestamp: true,
 	})
 
-	viper.SetConfigName("victron-mqtt-emm") // name of config file (without extension)
-	viper.SetConfigType("yaml")             // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("/etc")             // path to look for the config file in
-	viper.AddConfigPath("/data")            // optionally look for config in the working directory
-	viper.AddConfigPath(".")                // optionally look for config in the working directory
-	err := viper.ReadInConfig()             // Find and read the config file
-	if err != nil {                         // Handle errors reading the config file
+	viper.SetConfigName("victron-mqtt-bridge") // name of config file (without extension)
+	viper.SetConfigType("yaml")                // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/etc")                // path to look for the config file in
+	viper.AddConfigPath("/data")               // optionally look for config in the working directory
+	viper.AddConfigPath(".")                   // optionally look for config in the working directory
+	err := viper.ReadInConfig()                // Find and read the config file
+	if err != nil {                            // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
