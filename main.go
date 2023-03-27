@@ -8,12 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"victron_energymeter_mqtt/phase"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/godbus/dbus/introspect"
 	"github.com/godbus/dbus/v5"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"main.go/phase"
 )
 
 /* Configuration */
