@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +35,7 @@ var psum float64 = 0.00
 var psum_update bool = true
 var value_correction bool = false
 var conn, err = dbus.SystemBus()
+var dryrun bool
 
 const intro = `
 <node>
@@ -76,7 +77,10 @@ func (f objectpath) GetText() (string, *dbus.Error) {
 }
 
 func init() {
-	log.SetFormatter(&log.TextFormatter{})
+	log.SetFormatter(&log.TextFormatter{
+		// DisableColors: true,
+		FullTimestamp: true,
+	})
 
 	viper.SetConfigName("victron-mqtt-emm") // name of config file (without extension)
 	viper.SetConfigType("yaml")             // REQUIRED if the config file does not have the extension in the name
@@ -108,8 +112,27 @@ func init() {
 	// spew.Dump(viper.GetStringMap("l1"))
 	// spew.Dump()
 	//-----------------------------
-	if viper.GetBool("debug") {
+
+	dryrun = viper.GetBool("dryrun")
+	if dryrun {
+		log.Warn("dry run / dbus disabled")
+	}
+
+	switch viper.GetString("loglevel") {
+	case "info":
+		log.SetLevel(log.InfoLevel)
+		break
+	case "debug":
 		log.SetLevel(log.DebugLevel)
+		break
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+		break
+	case "trace":
+		log.SetLevel(log.TraceLevel)
+		break
+	default:
+		log.SetOutput(ioutil.Discard)
 	}
 
 	// -------- setup phases -----------
@@ -277,34 +300,40 @@ func main() {
 		"/Ac/L3/Energy/Reverse",
 	}
 
-	defer conn.Close()
 	// Some of the victron stuff requires it be called grid.cgwacs... using the only known valid value (from the simulator)
 	// This can _probably_ be changed as long as it matches com.victronenergy.grid.cgwacs_*
-	reply, err := conn.RequestName("com.victronenergy.grid.cgwacs_ttyUSB0_di30_mb1",
-		dbus.NameFlagDoNotQueue)
-	if err != nil {
-		log.Panic("Something went horribly wrong in the dbus connection")
-		panic(err)
-	}
+	if !dryrun {
+		defer conn.Close()
+		reply, err := conn.RequestName("com.victronenergy.grid.cgwacs_ttyUSB0_di30_mb1",
+			dbus.NameFlagDoNotQueue)
+		if err != nil {
+			log.Panic("Something went horribly wrong in the dbus connection")
+			panic(err)
+		}
 
-	if reply != dbus.RequestNameReplyPrimaryOwner {
-		log.Panic("name cgwacs_ttyUSB0_di30_mb1 already taken on dbus.")
-		os.Exit(1)
+		if reply != dbus.RequestNameReplyPrimaryOwner {
+			log.Panic("name cgwacs_ttyUSB0_di30_mb1 already taken on dbus.")
+			os.Exit(1)
+		}
 	}
 
 	for i, s := range basicPaths {
 		log.Debug("Registering dbus basic path #", i, ": ", s)
-		conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
-		conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
+		if !dryrun {
+			conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
+			conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
+		}
 	}
 
 	for i, s := range updatingPaths {
 		log.Debug("Registering dbus update path #", i, ": ", s)
-		conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
-		conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
+		if !dryrun {
+			conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
+			conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
+		}
 	}
 
-	log.Info("Successfully connected to dbus and registered as a meter... Commencing reading of the SDM630 meter")
+	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'... Commencing reading Starting MQTT")
 
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
@@ -317,7 +346,7 @@ func main() {
 	opts.OnConnectionLost = connectLostHandler
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
+		log.WithField("error", token.Error()).Panic("could not connect to MQTT server")
 	}
 	sub(client)
 	// Infinite loop
@@ -339,14 +368,20 @@ func sub(client mqtt.Client) {
 }
 
 /* Write dbus Values to Victron handler */
-func updateVariant(value float64, unit string, path string) {
+func updateVariant(value float64, unit string, path string) (err error) {
 	emit := make(map[string]dbus.Variant)
 	emit["Text"] = dbus.MakeVariant(fmt.Sprintf("%.2f", value) + unit)
 	emit["Value"] = dbus.MakeVariant(float64(value))
 	victronValues[0][objectpath(path)] = emit["Value"]
 	victronValues[1][objectpath(path)] = emit["Text"]
-	log.WithFields(log.Fields{"path": path, "unit": unit, "value": value}).Debug("new dbus value")
-	conn.Emit(dbus.ObjectPath(path), "com.victronenergy.BusItem.PropertiesChanged", emit)
+	err = conn.Emit(dbus.ObjectPath(path), "com.victronenergy.BusItem.PropertiesChanged", emit)
+	if err != nil {
+		log.WithFields(log.Fields{"path": path, "unit": unit, "value": value}).Warn("could not update dbus value")
+	} else {
+		log.WithFields(log.Fields{"path": path, "unit": unit, "value": value}).Trace("new dbus value")
+
+	}
+	return
 }
 
 /* Convert binary to float64 */
@@ -371,21 +406,13 @@ var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err
 
 /* Search for string with regex */
 func ContainString(searchstring string, str string) bool {
-	var obj bool
-
-	obj, err = regexp.MatchString(searchstring, str)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return obj
+	return strings.Contains(str, searchstring)
 }
 
 /* MQTT Subscribe Handler */
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 
-	log.Debug(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
+	log.Trace(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
 	value_correction = false
 	var foundSomething bool
 
@@ -394,42 +421,42 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		payload := string(msg.Payload())
 
 		//power
-		if v.Topics.Power != "" && ContainString(".*"+v.Topics.Power+"$", msg.Topic()) {
+		if v.Topics.Power != "" && ContainString(v.Topics.Power, msg.Topic()) {
 			v.Power = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Power}).
-				Debug("found matching topic for Power")
+				Trace("found matching topic for Power")
 			foundSomething = true
 		}
 
 		//current
-		if v.Topics.Current != "" && ContainString(".*"+v.Topics.Current+"$", msg.Topic()) {
+		if v.Topics.Current != "" && ContainString(v.Topics.Current, msg.Topic()) {
 			v.Current = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Current}).
-				Debug("found matching topic for Current")
+				Trace("found matching topic for Current")
 			foundSomething = true
 		}
 
 		//voltage
-		if v.Topics.Voltage != "" && ContainString(".*"+v.Topics.Voltage+"$", msg.Topic()) {
+		if v.Topics.Voltage != "" && ContainString(v.Topics.Voltage, msg.Topic()) {
 			v.Voltage = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Voltage}).
-				Debug("found matching topic for Voltage")
+				Trace("found matching topic for Voltage")
 			foundSomething = true
 		}
 
 		//Imported
-		if v.Topics.Imported != "" && ContainString(".*"+v.Topics.Imported+"$", msg.Topic()) {
+		if v.Topics.Imported != "" && ContainString(v.Topics.Imported, msg.Topic()) {
 			v.Imported = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Imported}).
-				Debug("found matching topic for Imported")
+				Trace("found matching topic for Imported")
 			foundSomething = true
 		}
 
 		//exported
-		if v.Topics.Exported != "" && ContainString(".*"+v.Topics.Exported+"$", msg.Topic()) {
+		if v.Topics.Exported != "" && ContainString(v.Topics.Exported, msg.Topic()) {
 			v.Exported = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Exported}).
-				Debug("found matching topic for Exported")
+				Trace("found matching topic for Exported")
 			foundSomething = true
 		}
 	}
@@ -460,12 +487,6 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 				emptyPower = true
 			}
 
-			updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
-			updateVariant(v.Current, "A", "/Ac/"+v.Name+"/Current")
-			updateVariant(v.Voltage, "V", "/Ac/"+v.Name+"/Voltage")
-			updateVariant(v.Exported, "kWh", "/Ac/"+v.Name+"/Energy/Forward")
-			updateVariant(v.Imported, "kWh", "/Ac/"+v.Name+"/Energy/Reverse")
-
 			tKw += v.Power
 			tImported += v.Imported
 			tExported += v.Exported
@@ -477,18 +498,24 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 				"Voltage":  v.Voltage,
 				"Exported": v.Exported,
 				"Imported": v.Imported,
-			}).Info("New values for " + v.Name)
+			}).Debug("New MQTT values for " + v.Name)
 			if emptyCurrent {
 				v.Current = 0
 			}
 			if emptyPower {
 				v.Power = 0
 			}
+			updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
+			updateVariant(v.Current, "A", "/Ac/"+v.Name+"/Current")
+			updateVariant(v.Voltage, "V", "/Ac/"+v.Name+"/Voltage")
+			updateVariant(v.Exported, "kWh", "/Ac/"+v.Name+"/Energy/Forward")
+			updateVariant(v.Imported, "kWh", "/Ac/"+v.Name+"/Energy/Reverse")
+
 		}
 
-		updateVariant(tKw, "W", "/Ac/Power")
-		updateVariant(tExported, "kWh", "/Ac/Energy/Forward")
-		updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
+		// updateVariant(tKw, "W", "/Ac/Power")
+		// updateVariant(tExported, "kWh", "/Ac/Energy/Forward")
+		// updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
 	}
 
 }

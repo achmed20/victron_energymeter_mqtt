@@ -1,25 +1,54 @@
-debug: false
+loglevel: info #loglevels are: "info,warn,debug,trace", remove to disable logging
+dryrun: true #disables dbus connection, for testing only
+client_id: "victron-3em-bridge"
+
+#mqtt config
 broker: 192.168.12.200
 port: 1883
-client_id: "victron-em-bridge"
 user: 
 password: 
-topic: stromzaehler/#
+topic: shellies/3em/emeter/#
 
-phases: 3
+phases: 3 #amount of phases, required
 
 L1:
+  #default values if some topic is missing
   voltage: 230.0
   current: 0.0
   power: 0.0
   imported: 0.0
   exported: 0.0
-  #relative from topic
+  #relative from topic, just write "something" is unassigned
   topic:
-    Power: sensor/current_energy/state
-    Voltage: sensor/current_voltage/state
-    Current: sensor/current_ampere/state
-    Imported: sensor/total_energy/state
-    Exported: sensor/total_exported/state
+    Power: 0/power 
+    Voltage: 0/voltage
+    Current: 0/current
+    Imported: 0/total
+    Exported: 0/total_returned
 
+L2:
+  voltage: 230.0
+  current: 0.0
+  power: 0.0
+  imported: 0.0
+  exported: 0.0
+  topic:
+    Power: 1/power
+    Voltage: 1/voltage
+    Current: 1/current
+    Imported: 1/total
+    Exported: 1/total_returned
+
+L3:
+  voltage: 230.0
+  current: 0.0
+  power: 0.0
+  imported: 0.0
+  exported: 0.0
+  topic:
+    Power: 2/power
+    Voltage: 2/voltage
+    Current: 2/current
+    Imported: 2/total
+    Exported: 2/total_returned
 
