@@ -453,6 +453,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 	log.Trace(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
 	value_correction = false
 	var foundSomething bool
+	var updateDbusGlobal bool
 
 	//itterate through phases
 	for key := 0; key < len(phase.Lines); key++ {
@@ -465,6 +466,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Power}).
 				Trace("found matching topic for Power")
 			foundSomething = true
+			updateDbusGlobal = true
 		}
 
 		//current
@@ -549,12 +551,14 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 
 			}
 
-			//update totals
+		}
+		//update totals
+		if updateDbusGlobal {
 			var tKw float64
 			var tImported float64
 			var tExported float64
 			for pk := 0; pk < len(phase.Lines); pk++ {
-				ph := &phase.Lines[key]
+				ph := &phase.Lines[pk]
 				tKw += ph.Power
 				tImported += ph.Imported
 				tExported += ph.Exported
