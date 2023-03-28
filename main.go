@@ -9,7 +9,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"victron_energymeter_mqtt/dbustools"
 	"victron_energymeter_mqtt/phase"
@@ -30,7 +32,9 @@ var (
 	DevideBy  = 1
 )
 
-var Cache map[string]phaseCache
+var Cache sync.Map
+
+// [string]phaseCache
 
 type phaseCache struct {
 	Field string
@@ -43,7 +47,7 @@ var totalMessages uint32
 var logInterval int32
 
 func init() {
-	Cache = make(map[string]phaseCache)
+	// Cache = make(map[string]phaseCache)
 
 	log.SetFormatter(&log.TextFormatter{
 		// DisableColors: true,
@@ -107,7 +111,7 @@ func init() {
 	log.Info(fmt.Sprintf("log interval set to %d", logInterval))
 
 	// -------- setup phases -----------
-	phase.LoadConfig(viper.GetStringMap("l1"))
+	phase.LoadConfig()
 }
 
 func main() {
@@ -140,12 +144,19 @@ func main() {
 		token.Wait()
 		log.Info("Subscribed to topic: " + topic)
 	}(client)
-	// Infinite loop
 
+	ticker := time.NewTicker(time.Second * time.Duration(logInterval))
+
+	for _ = range ticker.C {
+		log.WithField("updates_sent", totalMessages).Info("still allive")
+		totalMessages = 0
+	}
+
+	// Wait for ctrl+c
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-	fmt.Println("press ctrl+c to exit")
 	<-done
+	os.Exit(0)
 
 }
 
@@ -184,13 +195,11 @@ func IsPartOf(searchstring string, str string) bool {
 // ##########################################################################################
 
 var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-
-	log.Debug(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
+	log.Trace(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
 
 	payload := bin2Float64(string(msg.Payload()))
-
-	if _, ok := Cache[msg.Topic()]; !ok {
-		log.WithField("path", msg.Topic()).Debug("set cache for missing path")
+	if _, ok := Cache.Load(msg.Topic()); !ok {
+		log.WithField("path", msg.Topic()).Trace("set cache for missing path")
 		//itterate through phases if not found in cache
 		for key := 0; key < len(phase.Lines); key++ {
 			ph := phase.Lines[key]
@@ -201,144 +210,66 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			for i := 0; i < v.NumField(); i++ {
 				subtopic := v.Field(i).String()
 				if IsPartOf(subtopic, msg.Topic()) {
-					Cache[msg.Topic()] = phaseCache{
+					Cache.Store(msg.Topic(), phaseCache{
 						Field: typeOfS.Field(i).Name,
 						Valid: true,
 						Phase: &phase.Lines[key],
-					}
+					})
 					continue
 				}
 				// spew.Dump(typeOfS.Field(i).Name, v.Field(i).Interface())
 			}
 
 		}
-		if _, ok := Cache[msg.Topic()]; !ok {
-			log.WithField("path", msg.Topic()).Debug("path not found, creating dummy")
-			Cache[msg.Topic()] = phaseCache{
-				Field: "Dummy",
-			}
+		if _, ok := Cache.Load(msg.Topic()); !ok {
+			log.WithField("path", msg.Topic()).Trace("path not found, creating dummy")
+			Cache.Store(msg.Topic(), phaseCache{})
 		}
-	} else if ph, ok := Cache[msg.Topic()]; ok && ph.Valid {
-		log.WithField("path", msg.Topic()).Debug("cache found")
-		ph.Phase.SetByName(ph.Field, payload)
 	}
 
-	// for key := 0; key < len(phase.Lines); key++ {
-	// 	spew.Dump(phase.Lines[key])
-	// }
-
-}
-
-// #########################################################################
-
-/* MQTT Subscribe Handler */
-var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-
-	log.Debug(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
-	var foundSomething bool
-	var updateDbusGlobal bool
-
-	//itterate through phases
-	for key := 0; key < len(phase.Lines); key++ {
-		v := &phase.Lines[key]
-		payload := string(msg.Payload())
-
-		//power
-		if v.Topics.Power != "" && IsPartOf(v.Topics.Power, msg.Topic()) {
-			v.Power = bin2Float64(payload)
-			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Power}).
-				Trace("found matching topic for Power")
-			foundSomething = true
-			updateDbusGlobal = true
-		}
-
-		//current
-		if v.Topics.Current != "" && IsPartOf(v.Topics.Current, msg.Topic()) {
-			v.Current = bin2Float64(payload)
-			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Current}).
-				Trace("found matching topic for Current")
-			foundSomething = true
-		}
-
-		//voltage
-		if v.Topics.Voltage != "" && IsPartOf(v.Topics.Voltage, msg.Topic()) {
-			v.Voltage = bin2Float64(payload)
-			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Voltage}).
-				Trace("found matching topic for Voltage")
-			foundSomething = true
-		}
-
-		//Imported
-		// if v.Topics.Imported != "" && IsPartOf(v.Topics.Imported, msg.Topic()) {
-		if v.Topics.Imported != "" && IsPartOf(v.Topics.Imported, msg.Topic()) {
-			v.Imported = bin2Float64(payload)
-			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Imported}).
-				Trace("found matching topic for Imported")
-			foundSomething = true
-		}
-
-		//exported
-		if v.Topics.Exported != "" && IsPartOf(v.Topics.Exported, msg.Topic()) {
-			v.Exported = bin2Float64(payload)
-			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Exported}).
-				Trace("found matching topic for Exported")
-			foundSomething = true
-		}
-
-		if foundSomething {
+	if tmp, ok := Cache.Load(msg.Topic()); ok {
+		ph := tmp.(phaseCache)
+		if ph.Valid {
+			log.WithField("path", msg.Topic()).Trace("cache found")
+			ph.Phase.SetByName(ph.Field, payload)
 			totalMessages++
-			//fix / calc values
-			if v.Voltage == 0 {
-				log.Warn("Voltage missing, setting default value of 230")
-				v.Voltage = 230
+			if ph.Field == "Power" {
+				UpdateDbus(ph.Phase)
 			}
-			if v.Power != 0 && v.Current == 0 {
-				log.Debug("current missing, calculating value")
-				v.Current = v.Power / v.Voltage
-			}
-			if v.Current != 0 && v.Power == 0 {
-				log.Debug("power missing, calculating value")
-				v.Power = v.Voltage * v.Current
-			}
-			//update totals
-			if updateDbusGlobal {
-				UpdateDbus()
-			}
-
 		}
 	}
 
 }
 
-func UpdateDbus() {
+func UpdateDbus(uphase *phase.SinglePhase) {
+
+	if uphase != nil {
+		log.WithFields(log.Fields{
+			"Phase":    uphase.Name,
+			"Power":    uphase.Power,
+			"Current":  uphase.Current,
+			"Voltage":  uphase.Voltage,
+			"Exported": uphase.Exported,
+			"Imported": uphase.Imported,
+		}).Debug("New MQTT values for " + uphase.Name)
+
+		dbustools.Update(uphase.Power, "W", "/Ac/"+uphase.Name+"/Power")
+		dbustools.Update(uphase.Current, "A", "/Ac/"+uphase.Name+"/Current")
+		dbustools.Update(uphase.Voltage, "V", "/Ac/"+uphase.Name+"/Voltage")
+		dbustools.Update(uphase.Exported, "kWh", "/Ac/"+uphase.Name+"/Energy/Forward")
+		dbustools.Update(uphase.Imported, "kWh", "/Ac/"+uphase.Name+"/Energy/Reverse")
+
+	}
 
 	var tKw float64
 	var tImported float64
 	var tExported float64
-	for pk := 0; pk < len(phase.Lines); pk++ {
-		ph := &phase.Lines[pk]
+	for _, ph := range phase.Lines {
 		tKw += ph.Power
 		tImported += ph.Imported
 		tExported += ph.Exported
-
-		log.WithFields(log.Fields{
-			// "payload":  string(msg.Payload()),
-			// "topic":    msg.Topic(),
-			"Phase":    ph.Name,
-			"Power":    ph.Power,
-			"Current":  ph.Current,
-			"Voltage":  ph.Voltage,
-			"Exported": ph.Exported,
-			"Imported": ph.Imported,
-		}).Debug("New MQTT values for " + ph.Name)
-
-		dbustools.Update(ph.Power, "W", "/Ac/"+ph.Name+"/Power")
-		dbustools.Update(ph.Current, "A", "/Ac/"+ph.Name+"/Current")
-		dbustools.Update(ph.Voltage, "V", "/Ac/"+ph.Name+"/Voltage")
-		dbustools.Update(ph.Exported, "kWh", "/Ac/"+ph.Name+"/Energy/Forward")
-		dbustools.Update(ph.Imported, "kWh", "/Ac/"+ph.Name+"/Energy/Reverse")
-
 	}
+	log.WithFields(log.Fields{"W": tKw, "forwared": tExported, "reverse": tImported}).Debug("global Dbus update")
 	dbustools.Update(tKw, "W", "/Ac/Power")
 	dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward")
 	dbustools.Update(tImported, "kWh", "/Ac/Energy/Reverse")

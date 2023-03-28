@@ -10,8 +10,6 @@ import (
 
 var Lines []SinglePhase
 
-// var Cache map[string]phaseCache
-
 type Topics struct {
 	Voltage  string
 	Current  string
@@ -30,23 +28,8 @@ type SinglePhase struct {
 	Topics Topics
 }
 
-type phaseCache struct {
-	Field string
-	Phase *SinglePhase
-}
-
 func init() {
-	// Cache := make(map[string]phaseCache)
-}
 
-func (s *SinglePhase) SetDefaults(def SinglePhase) {
-
-	s.Voltage = def.Voltage
-	s.Current = def.Current
-	s.Power = def.Power
-
-	s.Imported = def.Imported
-	s.Exported = def.Exported
 }
 
 func (i *SinglePhase) SetByName(propName string, propValue float64) *SinglePhase {
@@ -54,7 +37,22 @@ func (i *SinglePhase) SetByName(propName string, propValue float64) *SinglePhase
 	return i
 }
 
-func LoadConfig(lineDefaults map[string]interface{}) {
+func (s *SinglePhase) FixValues() {
+	if s.Voltage == 0 {
+		log.Debug("Voltage missing, setting default value of 230")
+		s.Voltage = 230
+	}
+	if s.Power != 0 && s.Current == 0 {
+		log.Debug("current missing, calculating value")
+		s.Current = s.Power / s.Voltage
+	}
+	if s.Current != 0 && s.Power == 0 {
+		log.Debug("power missing, calculating value")
+		s.Power = s.Voltage * s.Current
+	}
+}
+
+func LoadConfig() {
 	for i := 1; i < 10; i++ {
 		var lineName = "l" + strconv.Itoa(i)
 		var lineVals = viper.GetStringMap(lineName)
