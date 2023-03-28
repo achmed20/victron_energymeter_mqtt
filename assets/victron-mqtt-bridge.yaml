@@ -4,7 +4,7 @@ loginterval: 3600                       #time in secods to write periodic logs. 
 client_id: "victron-mqtt-bridge"         #Name inside Victron
 
 #mqtt config, most likley the only thing you need to change
-broker: 192.168.12.200
+broker: localhost
 port: 1883
 user: 
 password: 
