@@ -70,8 +70,6 @@ func init() {
 	USERNAME = viper.GetString("user")
 	PASSWORD = viper.GetString("password")
 
-	// spew.Dump(viper.GetStringMap("l1"))
-	// spew.Dump()
 	//-----------------------------
 
 	if viper.GetBool("dryrun") {
@@ -102,43 +100,7 @@ func init() {
 	log.Info(fmt.Sprintf("log interval set to %d", logInterval))
 
 	// -------- setup phases -----------
-	lineName := "l1"
-	var lineDefaults = viper.GetStringMap(lineName)
-	if len(lineDefaults) == 0 {
-		log.Panic("no config for L1 found, exiting")
-	}
-	for i := 1; i < viper.GetInt("phases")+1; i++ {
-		lineName = "l" + strconv.Itoa(i)
-		var lineVals = viper.GetStringMap(lineName)
-		log.Debug("getting config for " + lineName)
-
-		if len(lineVals) == 0 {
-			phase.Lines = append(phase.Lines, phase.SinglePhase{
-				Name:    "L" + strconv.Itoa(i),
-				Voltage: phase.Lines[0].Voltage,
-			})
-		} else {
-			topics := lineVals["topic"].(map[string]interface{})
-			phase.Lines = append(phase.Lines, phase.SinglePhase{
-				Name:     "L" + strconv.Itoa(i),
-				Voltage:  lineVals["voltage"].(float64),
-				Current:  lineVals["current"].(float64),
-				Power:    lineVals["power"].(float64),
-				Imported: lineVals["imported"].(float64),
-				Exported: lineVals["exported"].(float64),
-
-				Topics: phase.Topics{
-					Voltage:  topics["voltage"].(string),
-					Power:    topics["power"].(string),
-					Current:  topics["current"].(string),
-					Imported: topics["imported"].(string),
-					Exported: topics["exported"].(string),
-				},
-			})
-		}
-
-	}
-
+	phase.LoadConfig(viper.GetStringMap("l1"))
 }
 
 func main() {
