@@ -184,6 +184,8 @@ func init() {
 
 func main() {
 	connectDbus()
+	defer conn.Close()
+
 	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'")
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
@@ -350,7 +352,6 @@ func connectDbus() {
 	// Some of the victron stuff requires it be called grid.cgwacs... using the only known valid value (from the simulator)
 	// This can _probably_ be changed as long as it matches com.victronenergy.grid.cgwacs_*
 	if !dryrun {
-		defer conn.Close()
 		reply, err := conn.RequestName("com.victronenergy.grid.cgwacs_ttyUSB0_di30_mb1",
 			dbus.NameFlagDoNotQueue)
 		if err != nil {

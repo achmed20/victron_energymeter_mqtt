@@ -4,9 +4,7 @@ run:
 
 build:
 	echo "Compiling for ARM OS (Venus)"
-	GOOS=linux GOARCH=arm go build -o bin/main-linux-arm/victron-mqtt-bridge main.go
-	mkdir -p .build
-	cp bin/main-linux-arm/victron-mqtt-bridge .build
+	GOOS=linux GOARCH=arm go build -o .build/victron-mqtt-bridge main.go
 	cp ./assets/* .build
 
 release:
