@@ -1,6 +1,5 @@
 loglevel: info #loglevels are: "info,warn,debug,trace", remove to disable logging
 loginterval: 5 #time in secods to write periodic logs. default: 3600
-updateinterval: 1000 # in miliseconds
 dryrun: true #disables dbus connection, for testing only
 client_id: "victron-3em-bridge"
 

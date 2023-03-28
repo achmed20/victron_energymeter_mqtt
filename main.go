@@ -506,8 +506,8 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 			totalMessages++
 
 			{
-				var emptyCurrent bool
-				var emptyPower bool
+				// var emptyCurrent bool
+				// var emptyPower bool
 				//fix / calc values
 				if v.Voltage == 0 {
 					log.Warn("Voltage missing, setting default value of 230")
@@ -516,44 +516,46 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 				if v.Power != 0 && v.Current == 0 {
 					log.Debug("current missing, calculating value")
 					v.Current = v.Power / v.Voltage
-					emptyCurrent = true
+					// emptyCurrent = true
 				}
 				if v.Current != 0 && v.Power == 0 {
 					log.Debug("power missing, calculating value")
 					v.Power = v.Voltage * v.Current
-					emptyPower = true
+					// emptyPower = true
 				}
 
 				// if strings.Contains(msg.Topic(), "/2/")
-				{
-					log.WithFields(log.Fields{
-						// "payload":  string(msg.Payload()),
-						// "topic":    msg.Topic(),
-						"Phase":    v.Name,
-						"Power":    v.Power,
-						"Current":  v.Current,
-						"Voltage":  v.Voltage,
-						"Exported": v.Exported,
-						"Imported": v.Imported,
-					}).Debug("New MQTT values for " + v.Name)
-					if emptyCurrent {
-						v.Current = 0
-					}
-					if emptyPower {
-						v.Power = 0
-					}
-					updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
-					updateVariant(v.Current, "A", "/Ac/"+v.Name+"/Current")
-					updateVariant(v.Voltage, "V", "/Ac/"+v.Name+"/Voltage")
-					updateVariant(v.Exported, "kWh", "/Ac/"+v.Name+"/Energy/Forward")
-					updateVariant(v.Imported, "kWh", "/Ac/"+v.Name+"/Energy/Reverse")
-				}
+				// {
+				// 	if emptyCurrent {
+				// 		v.Current = 0
+				// 	}
+				// 	if emptyPower {
+				// 		v.Power = 0
+				// 	}
+				// }
 
 			}
 
 		}
 		//update totals
 		if updateDbusGlobal {
+			log.WithFields(log.Fields{
+				// "payload":  string(msg.Payload()),
+				// "topic":    msg.Topic(),
+				"Phase":    v.Name,
+				"Power":    v.Power,
+				"Current":  v.Current,
+				"Voltage":  v.Voltage,
+				"Exported": v.Exported,
+				"Imported": v.Imported,
+			}).Debug("New MQTT values for " + v.Name)
+
+			updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
+			updateVariant(v.Current, "A", "/Ac/"+v.Name+"/Current")
+			updateVariant(v.Voltage, "V", "/Ac/"+v.Name+"/Voltage")
+			updateVariant(v.Exported, "kWh", "/Ac/"+v.Name+"/Energy/Forward")
+			updateVariant(v.Imported, "kWh", "/Ac/"+v.Name+"/Energy/Reverse")
+
 			var tKw float64
 			var tImported float64
 			var tExported float64
