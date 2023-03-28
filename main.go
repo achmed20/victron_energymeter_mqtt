@@ -14,7 +14,6 @@ import (
 	"victron_energymeter_mqtt/dbustools"
 	"victron_energymeter_mqtt/phase"
 
-	"github.com/davecgh/go-spew/spew"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -31,17 +30,21 @@ var (
 	DevideBy  = 1
 )
 
-// var P1 float64 = 0.00
-// var P2 float64 = 0.00
-// var P3 float64 = 0.00
-// var psum float64 = 0.00
-// var psum_update bool = true
-// var value_correction bool = false
+var Cache map[string]phaseCache
+
+type phaseCache struct {
+	Field string
+	Valid bool
+	Phase *phase.SinglePhase
+}
+
 var dryrun bool
 var totalMessages uint32
 var logInterval int32
 
 func init() {
+	Cache = make(map[string]phaseCache)
+
 	log.SetFormatter(&log.TextFormatter{
 		// DisableColors: true,
 		FullTimestamp: true,
@@ -180,20 +183,14 @@ func IsPartOf(searchstring string, str string) bool {
 
 // ##########################################################################################
 
-type phaseCache struct {
-	Field string
-	Phase *phase.SinglePhase
-}
-
-var cache map[string]phaseCache
-
 var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 
 	log.Debug(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
 
 	payload := bin2Float64(string(msg.Payload()))
 
-	if _, ok := cache[msg.Topic()]; ok {
+	if _, ok := Cache[msg.Topic()]; !ok {
+		log.WithField("path", msg.Topic()).Debug("set cache for missing path")
 		//itterate through phases if not found in cache
 		for key := 0; key < len(phase.Lines); key++ {
 			ph := phase.Lines[key]
@@ -204,8 +201,9 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			for i := 0; i < v.NumField(); i++ {
 				subtopic := v.Field(i).String()
 				if IsPartOf(subtopic, msg.Topic()) {
-					cache[msg.Topic()] = phaseCache{
+					Cache[msg.Topic()] = phaseCache{
 						Field: typeOfS.Field(i).Name,
+						Valid: true,
 						Phase: &phase.Lines[key],
 					}
 					continue
@@ -214,13 +212,20 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			}
 
 		}
-	} else if ph, ok := cache[msg.Topic()]; ok {
+		if _, ok := Cache[msg.Topic()]; !ok {
+			log.WithField("path", msg.Topic()).Debug("path not found, creating dummy")
+			Cache[msg.Topic()] = phaseCache{
+				Field: "Dummy",
+			}
+		}
+	} else if ph, ok := Cache[msg.Topic()]; ok && ph.Valid {
+		log.WithField("path", msg.Topic()).Debug("cache found")
 		ph.Phase.SetByName(ph.Field, payload)
 	}
 
-	for key := 0; key < len(phase.Lines); key++ {
-		spew.Dump(phase.Lines[key])
-	}
+	// for key := 0; key < len(phase.Lines); key++ {
+	// 	spew.Dump(phase.Lines[key])
+	// }
 
 }
 
