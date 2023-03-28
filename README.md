@@ -36,8 +36,6 @@ user:
 password: 
 topic: shellies/3em/emeter/#            #base topic. the "#" will subscribe to ALL topics beneath it
 
-phases: 3                               #amount of phases, required
-
 # Required, if if you 
 L1:
   #default values in case some topic is missing
