@@ -11,4 +11,4 @@ release:
 	zip -FSrj build.zip ./.build/* README.md
 
 copy:
-	scp .build/* root@einstein:/data
+	scp .build/* root@192.168.12.205:/data

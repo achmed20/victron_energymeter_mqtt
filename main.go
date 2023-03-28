@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"victron_energymeter_mqtt/phase"
@@ -65,6 +67,7 @@ var victronValues = map[int]map[objectpath]dbus.Variant{
 	// 1: This will be used to store the STRING variant
 	1: map[objectpath]dbus.Variant{},
 }
+var victronValuesMutex = &sync.RWMutex{}
 
 func (f objectpath) GetValue() (dbus.Variant, *dbus.Error) {
 	log.Debug("GetValue() called for ", f)
@@ -186,11 +189,17 @@ func main() {
 	connectDbus()
 	defer conn.Close()
 
+	// mqtt.ERROR = llog.New(os.Stdout, "[ERROR] ", 0)
+	// mqtt.CRITICAL = llog.New(os.Stdout, "[CRIT] ", 0)
+	// mqtt.WARN = llog.New(os.Stdout, "[WARN]  ", 0)
+	// mqtt.DEBUG = llog.New(os.Stdout, "[DEBUG] ", 0)
+
 	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'")
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
+	opts.SetOrderMatters(false) //important or it will crash
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", BROKER, PORT))
-	opts.SetClientID(CLIENT_ID)
+	opts.SetClientID(CLIENT_ID + RandomString(10))
 	opts.SetUsername(USERNAME)
 	opts.SetPassword(PASSWORD)
 	opts.SetDefaultPublishHandler(messagePubHandler) //func that handles all messages
@@ -202,8 +211,13 @@ func main() {
 	}
 	sub(client)
 	// Infinite loop
+
+	// done := make(chan os.Signal, 1)
+	// signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+	// fmt.Println("Blocking, press ctrl+c to continue...")
+	// <-done // Will block here until user hits ctrl+c
+
 	for true {
-		//fmt.Println("Infinite Loop entered")
 		log.WithField("messages", totalMessages).Info("MQTT messages processed")
 		totalMessages = 0
 		time.Sleep(time.Second * time.Duration(logInterval))
@@ -388,9 +402,13 @@ func updateVariant(value float64, unit string, path string) (err error) {
 	emit := make(map[string]dbus.Variant)
 	emit["Text"] = dbus.MakeVariant(fmt.Sprintf("%.2f", value) + unit)
 	emit["Value"] = dbus.MakeVariant(float64(value))
+	victronValuesMutex.Lock()
 	victronValues[0][objectpath(path)] = emit["Value"]
 	victronValues[1][objectpath(path)] = emit["Text"]
-	err = conn.Emit(dbus.ObjectPath(path), "com.victronenergy.BusItem.PropertiesChanged", emit)
+	victronValuesMutex.Unlock()
+	if !dryrun {
+		err = conn.Emit(dbus.ObjectPath(path), "com.victronenergy.BusItem.PropertiesChanged", emit)
+	}
 	if err != nil {
 		log.WithFields(log.Fields{"path": path, "unit": unit, "value": value}).Warn("could not update dbus value")
 	} else {
@@ -536,4 +554,14 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
 	}
 
+}
+
+func RandomString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
 }
