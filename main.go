@@ -440,8 +440,11 @@ var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err
 }
 
 /* Search for string with regex */
-func ContainString(searchstring string, str string) bool {
-	return strings.Contains(str, searchstring)
+func IsPartOf(searchstring string, str string) bool {
+	out := strings.HasSuffix(str, searchstring)
+	// spew.Dump(str, searchstring, out)
+	return out
+	// return strings.Contains(str, searchstring)
 }
 
 /* MQTT Subscribe Handler */
@@ -451,12 +454,13 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 	value_correction = false
 	var foundSomething bool
 
+	//itterate through phases
 	for key := 0; key < len(phase.Lines); key++ {
 		v := &phase.Lines[key]
 		payload := string(msg.Payload())
 
 		//power
-		if v.Topics.Power != "" && ContainString(v.Topics.Power, msg.Topic()) {
+		if v.Topics.Power != "" && IsPartOf(v.Topics.Power, msg.Topic()) {
 			v.Power = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Power}).
 				Trace("found matching topic for Power")
@@ -464,7 +468,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		}
 
 		//current
-		if v.Topics.Current != "" && ContainString(v.Topics.Current, msg.Topic()) {
+		if v.Topics.Current != "" && IsPartOf(v.Topics.Current, msg.Topic()) {
 			v.Current = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Current}).
 				Trace("found matching topic for Current")
@@ -472,7 +476,7 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		}
 
 		//voltage
-		if v.Topics.Voltage != "" && ContainString(v.Topics.Voltage, msg.Topic()) {
+		if v.Topics.Voltage != "" && IsPartOf(v.Topics.Voltage, msg.Topic()) {
 			v.Voltage = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Voltage}).
 				Trace("found matching topic for Voltage")
@@ -480,7 +484,8 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		}
 
 		//Imported
-		if v.Topics.Imported != "" && ContainString(v.Topics.Imported, msg.Topic()) {
+		// if v.Topics.Imported != "" && IsPartOf(v.Topics.Imported, msg.Topic()) {
+		if v.Topics.Imported != "" && IsPartOf(v.Topics.Imported, msg.Topic()) {
 			v.Imported = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Imported}).
 				Trace("found matching topic for Imported")
@@ -488,70 +493,77 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		}
 
 		//exported
-		if v.Topics.Exported != "" && ContainString(v.Topics.Exported, msg.Topic()) {
+		if v.Topics.Exported != "" && IsPartOf(v.Topics.Exported, msg.Topic()) {
 			v.Exported = bin2Float64(payload)
 			log.WithFields(log.Fields{"phase": v.Name, "payload": payload, "topic": v.Topics.Exported}).
 				Trace("found matching topic for Exported")
 			foundSomething = true
 		}
-	}
 
-	if foundSomething {
-		totalMessages++
-		var tKw float64
-		var tImported float64
-		var tExported float64
-		var emptyCurrent bool
-		var emptyPower bool
+		if foundSomething {
+			totalMessages++
 
-		for key := 0; key < len(phase.Lines); key++ {
+			{
+				var emptyCurrent bool
+				var emptyPower bool
+				//fix / calc values
+				if v.Voltage == 0 {
+					log.Warn("Voltage missing, setting default value of 230")
+					v.Voltage = 230
+				}
+				if v.Power != 0 && v.Current == 0 {
+					log.Debug("current missing, calculating value")
+					v.Current = v.Power / v.Voltage
+					emptyCurrent = true
+				}
+				if v.Current != 0 && v.Power == 0 {
+					log.Debug("power missing, calculating value")
+					v.Power = v.Voltage * v.Current
+					emptyPower = true
+				}
 
-			v := &phase.Lines[key]
-			//fix / calc values
-			if v.Voltage == 0 {
-				log.Warn("Voltage missing, setting default value of 230")
-				v.Voltage = 230
+				// if strings.Contains(msg.Topic(), "/2/")
+				{
+					log.WithFields(log.Fields{
+						// "payload":  string(msg.Payload()),
+						// "topic":    msg.Topic(),
+						"Phase":    v.Name,
+						"Power":    v.Power,
+						"Current":  v.Current,
+						"Voltage":  v.Voltage,
+						"Exported": v.Exported,
+						"Imported": v.Imported,
+					}).Debug("New MQTT values for " + v.Name)
+					if emptyCurrent {
+						v.Current = 0
+					}
+					if emptyPower {
+						v.Power = 0
+					}
+					updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
+					updateVariant(v.Current, "A", "/Ac/"+v.Name+"/Current")
+					updateVariant(v.Voltage, "V", "/Ac/"+v.Name+"/Voltage")
+					updateVariant(v.Exported, "kWh", "/Ac/"+v.Name+"/Energy/Forward")
+					updateVariant(v.Imported, "kWh", "/Ac/"+v.Name+"/Energy/Reverse")
+				}
+
 			}
-			if v.Power != 0 && v.Current == 0 {
-				log.Debug("current missing, calculating value")
-				v.Current = v.Power / v.Voltage
-				emptyCurrent = true
-			}
-			if v.Current != 0 && v.Power == 0 {
-				log.Debug("power missing, calculating value")
-				v.Power = v.Voltage * v.Current
-				emptyPower = true
-			}
 
-			tKw += v.Power
-			tImported += v.Imported
-			tExported += v.Exported
+			//update totals
+			var tKw float64
+			var tImported float64
+			var tExported float64
+			for pk := 0; pk < len(phase.Lines); pk++ {
+				ph := &phase.Lines[key]
+				tKw += ph.Power
+				tImported += ph.Imported
+				tExported += ph.Exported
 
-			log.WithFields(log.Fields{
-				"Phase":    v.Name,
-				"Power":    v.Power,
-				"Current":  v.Current,
-				"Voltage":  v.Voltage,
-				"Exported": v.Exported,
-				"Imported": v.Imported,
-			}).Debug("New MQTT values for " + v.Name)
-			if emptyCurrent {
-				v.Current = 0
 			}
-			if emptyPower {
-				v.Power = 0
-			}
-			updateVariant(v.Power, "W", "/Ac/"+v.Name+"/Power")
-			updateVariant(v.Current, "A", "/Ac/"+v.Name+"/Current")
-			updateVariant(v.Voltage, "V", "/Ac/"+v.Name+"/Voltage")
-			updateVariant(v.Exported, "kWh", "/Ac/"+v.Name+"/Energy/Forward")
-			updateVariant(v.Imported, "kWh", "/Ac/"+v.Name+"/Energy/Reverse")
-
+			updateVariant(tKw, "W", "/Ac/Power")
+			updateVariant(tExported, "kWh", "/Ac/Energy/Forward")
+			updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
 		}
-
-		updateVariant(tKw, "W", "/Ac/Power")
-		updateVariant(tExported, "kWh", "/Ac/Energy/Forward")
-		updateVariant(tImported, "kWh", "/Ac/Energy/Reverse")
 	}
 
 }
