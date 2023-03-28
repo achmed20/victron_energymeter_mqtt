@@ -201,7 +201,7 @@ func Connect() {
 	}
 
 	for i, s := range basicPaths {
-		log.Debug("Registering dbus basic path #", i, ": ", s)
+		log.Trace("Registering dbus basic path #", i, ": ", s)
 		if !DryRun {
 			conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
 			conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")
@@ -209,7 +209,7 @@ func Connect() {
 	}
 
 	for i, s := range updatingPaths {
-		log.Debug("Registering dbus update path #", i, ": ", s)
+		log.Trace("Registering dbus update path #", i, ": ", s)
 		if !DryRun {
 			conn.Export(objectpath(s), s, "com.victronenergy.BusItem")
 			conn.Export(introspect.Introspectable(intro), s, "org.freedesktop.DBus.Introspectable")

@@ -1,6 +1,7 @@
 package phase
 
 import (
+	"reflect"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -37,11 +38,16 @@ func (s *SinglePhase) SetDefaults(def SinglePhase) {
 	s.Exported = def.Exported
 }
 
+func (i *SinglePhase) SetByName(propName string, propValue float64) *SinglePhase {
+	reflect.ValueOf(i).Elem().FieldByName(propName).Set(reflect.ValueOf(propValue))
+	return i
+}
+
 func LoadConfig(lineDefaults map[string]interface{}) {
 	for i := 1; i < 10; i++ {
 		var lineName = "l" + strconv.Itoa(i)
 		var lineVals = viper.GetStringMap(lineName)
-		log.Debug("getting config for " + lineName)
+		log.Trace("getting config for " + lineName)
 		if len(lineVals) == 0 && lineName == "l1" {
 			log.Panic("at least L1 required in config")
 		} else if len(lineVals) == 0 {

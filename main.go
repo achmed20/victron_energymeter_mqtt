@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
+	"os/signal"
+	"reflect"
 	"strconv"
 	"strings"
-	"time"
+	"syscall"
 
 	"victron_energymeter_mqtt/dbustools"
 	"victron_energymeter_mqtt/phase"
 
+	"github.com/davecgh/go-spew/spew"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -27,12 +31,12 @@ var (
 	DevideBy  = 1
 )
 
-var P1 float64 = 0.00
-var P2 float64 = 0.00
-var P3 float64 = 0.00
-var psum float64 = 0.00
-var psum_update bool = true
-var value_correction bool = false
+// var P1 float64 = 0.00
+// var P2 float64 = 0.00
+// var P3 float64 = 0.00
+// var psum float64 = 0.00
+// var psum_update bool = true
+// var value_correction bool = false
 var dryrun bool
 var totalMessages uint32
 var logInterval int32
@@ -120,40 +124,29 @@ func main() {
 	opts.SetClientID(CLIENT_ID + RandomString(10))
 	opts.SetUsername(USERNAME)
 	opts.SetPassword(PASSWORD)
-	opts.SetDefaultPublishHandler(messagePubHandler) //func that handles all messages
+	opts.SetDefaultPublishHandler(messageHandler) //func that handles all messages
 	opts.OnConnect = connectHandler
 	opts.OnConnectionLost = connectLostHandler
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.WithField("error", token.Error()).Panic("could not connect to MQTT server")
 	}
-	sub(client)
+	func(client mqtt.Client) {
+		topic := TOPIC
+		token := client.Subscribe(topic, 1, nil)
+		token.Wait()
+		log.Info("Subscribed to topic: " + topic)
+	}(client)
 	// Infinite loop
 
-	// done := make(chan os.Signal, 1)
-	// signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-	// fmt.Println("Blocking, press ctrl+c to continue...")
-	// <-done // Will block here until user hits ctrl+c
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+	fmt.Println("press ctrl+c to exit")
+	<-done
 
-	for true {
-		log.WithField("messages", totalMessages).Info("MQTT messages processed")
-		totalMessages = 0
-		time.Sleep(time.Second * time.Duration(logInterval))
-	}
-
-	// This is a forever loop^^
-	panic("Error: We terminated.... how did we ever get here?")
 }
 
-// -----------------------------------------------------------------
-
-/* MQTT Subscribe Function */
-func sub(client mqtt.Client) {
-	topic := TOPIC
-	token := client.Subscribe(topic, 1, nil)
-	token.Wait()
-	log.Info("Subscribed to topic: " + topic)
-}
+// ------------------------------------------------------------------------------------
 
 /* Convert binary to float64 */
 func bin2Float64(bin string) float64 {
@@ -174,6 +167,7 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
 	//panic and let the script restart
 	log.Panic(fmt.Sprintf("Connect lost: %v", err))
+	//os.Exit(1)
 }
 
 /* Search for string with regex */
@@ -184,11 +178,58 @@ func IsPartOf(searchstring string, str string) bool {
 	// return strings.Contains(str, searchstring)
 }
 
+// ##########################################################################################
+
+type phaseCache struct {
+	Field string
+	Phase *phase.SinglePhase
+}
+
+var cache map[string]phaseCache
+
+var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+
+	log.Debug(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
+
+	payload := bin2Float64(string(msg.Payload()))
+
+	if _, ok := cache[msg.Topic()]; ok {
+		//itterate through phases if not found in cache
+		for key := 0; key < len(phase.Lines); key++ {
+			ph := phase.Lines[key]
+
+			v := reflect.ValueOf(ph.Topics)
+			typeOfS := v.Type()
+
+			for i := 0; i < v.NumField(); i++ {
+				subtopic := v.Field(i).String()
+				if IsPartOf(subtopic, msg.Topic()) {
+					cache[msg.Topic()] = phaseCache{
+						Field: typeOfS.Field(i).Name,
+						Phase: &phase.Lines[key],
+					}
+					continue
+				}
+				// spew.Dump(typeOfS.Field(i).Name, v.Field(i).Interface())
+			}
+
+		}
+	} else if ph, ok := cache[msg.Topic()]; ok {
+		ph.Phase.SetByName(ph.Field, payload)
+	}
+
+	for key := 0; key < len(phase.Lines); key++ {
+		spew.Dump(phase.Lines[key])
+	}
+
+}
+
+// #########################################################################
+
 /* MQTT Subscribe Handler */
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 
-	log.Trace(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
-	value_correction = false
+	log.Debug(fmt.Sprintf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic()))
 	var foundSomething bool
 	var updateDbusGlobal bool
 
