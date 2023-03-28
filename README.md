@@ -16,16 +16,9 @@ The goal was to make a MQTT bridge which supports all sorts of EM meters as long
   - Autogenerates `current` based on `power` and `voltage`
   - able to set default for Voltage in case its missing
 
-```sh
-$# ./victron-mqtt-bridge
-INFO[2023-03-27T15:53:46] Successfully connected to dbus and registered as a 'victron-mqtt-bridge' 
-INFO[2023-03-27T15:53:46] Connected to broker 192.168.0.100:1883      
-INFO[2023-03-27T15:53:46] Subscribed to topic: shellies/3em/emeter/#   
-INFO[2023-03-27T15:53:46] MQTT messages processed                       messages=0
-INFO[2023-03-27T16:53:51] MQTT messages processed                       messages=1530
-INFO[2023-03-27T17:53:56] MQTT messages processed                       messages=3115
-...
-```
+![Victron Overview](./.media/meter.png)
+
+![logfile](./.media/log.png)
 
 # Configuration
 

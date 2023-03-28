@@ -10,8 +10,6 @@ user:
 password: 
 topic: shellies/3em/emeter/#
 
-phases: 3 #amount of phases, required
-
 L1:
   #default values if some topic is missing
   voltage: 230.0

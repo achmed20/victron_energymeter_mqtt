@@ -112,6 +112,9 @@ func init() {
 
 	// -------- setup phases -----------
 	phase.LoadConfig()
+	for _, v := range phase.Lines {
+		log.Info("Configuration found for " + v.Name)
+	}
 }
 
 func main() {
