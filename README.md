@@ -115,8 +115,5 @@ loglevel: trace
 **make sure to set it back to `info` once your problem is solved**
 
 ### Values dont change?
-Search the output for `found matching topic`! If you dont have those, its likely that either your main `topic` or the topics of `L1-L3` are wrong
-```
-TRAC[2023-03-27T14:44:06+02:00] Received message: 200.28 from topic: shellies/3em/emeter/2/power 
-TRAC[2023-03-27T14:44:06+02:00] found matching topic for Power                payload=200.28 phase=L3 topic=2/power
-```
+Search the output for `path not found, creating dummy`! If you  have those, its likely that either your main `topic` or the topics of `L1-L3` are wrong
+
