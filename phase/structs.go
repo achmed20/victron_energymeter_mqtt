@@ -10,6 +10,8 @@ import (
 
 var Lines []SinglePhase
 
+// var Cache map[string]phaseCache
+
 type Topics struct {
 	Voltage  string
 	Current  string
@@ -26,6 +28,15 @@ type SinglePhase struct {
 	Exported float64 // kWh, sold power
 
 	Topics Topics
+}
+
+type phaseCache struct {
+	Field string
+	Phase *SinglePhase
+}
+
+func init() {
+	// Cache := make(map[string]phaseCache)
 }
 
 func (s *SinglePhase) SetDefaults(def SinglePhase) {
