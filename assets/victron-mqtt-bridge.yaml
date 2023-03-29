@@ -1,7 +1,8 @@
-loglevel: info                         #loglevels are: "info,warn,debug,trace", remove to disable logging
+loglevel: info                          #loglevels are: "info,warn,debug,trace", remove to disable logging
 loginterval: 3600                       #time in secods to write periodic logs. default: 3600
+updateinterval: 0                       #updates to the DBUS > 0 = live on power changes, otherwhise in miliseconds
 #dryrun: true                           #disables dbus connection, for testing only
-client_id: "victron-mqtt-bridge"         #Name inside Victron
+client_id: "victron-mqtt-bridge"        #Name inside Victron
 
 #mqtt config, most likley the only thing you need to change
 broker: 192.168.12.200

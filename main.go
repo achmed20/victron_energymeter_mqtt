@@ -45,6 +45,7 @@ type phaseCache struct {
 var dryrun bool
 var totalMessages uint32
 var logInterval int32
+var updateInterval int32
 
 func init() {
 	// Cache = make(map[string]phaseCache)
@@ -104,6 +105,12 @@ func init() {
 	default:
 		log.SetOutput(ioutil.Discard)
 	}
+
+	updateInterval = viper.GetInt32("updateinterval")
+	if updateInterval < 250 && updateInterval != 0 {
+		updateInterval = 250
+	}
+
 	logInterval = viper.GetInt32("loginterval")
 	if logInterval == 0 {
 		logInterval = 3600
@@ -148,11 +155,27 @@ func main() {
 		log.Info("Subscribed to topic: " + topic)
 	}(client)
 
-	ticker := time.NewTicker(time.Second * time.Duration(logInterval))
+	go func() {
+		logTicker := time.NewTicker(time.Second * time.Duration(logInterval))
+		for _ = range logTicker.C {
+			log.WithField("updates_sent", totalMessages).Info("still allive")
+			totalMessages = 0
+		}
+	}()
 
-	for _ = range ticker.C {
-		log.WithField("updates_sent", totalMessages).Info("still allive")
-		totalMessages = 0
+	if updateInterval > 0 {
+		go func() {
+			updateTicker := time.NewTicker(time.Millisecond * time.Duration(updateInterval))
+			log.WithField("ms", updateInterval).Info("update interval set to delayed")
+			for _ = range updateTicker.C {
+				for _, ph := range phase.Lines {
+					UpdateDbusPhase(&ph)
+				}
+				UpdateDbusGlobal()
+			}
+		}()
+	} else {
+		log.WithField("ms", updateInterval).Info("update interval set to LIVE")
 	}
 
 	// Wait for ctrl+c
@@ -235,18 +258,18 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 		if ph.Valid {
 			log.WithField("path", msg.Topic()).Trace("cache found")
 			ph.Phase.SetByName(ph.Field, payload)
-			totalMessages++
-			if ph.Field == "Power" {
-				UpdateDbus(ph.Phase)
+			if ph.Field == "Power" && updateInterval == 0 {
+				UpdateDbusPhase(ph.Phase)
+				UpdateDbusGlobal()
 			}
 		}
 	}
 
 }
 
-func UpdateDbus(uphase *phase.SinglePhase) {
-
+func UpdateDbusPhase(uphase *phase.SinglePhase) {
 	if uphase != nil {
+		totalMessages++
 		log.WithFields(log.Fields{
 			"Phase":    uphase.Name,
 			"Power":    uphase.Power,
@@ -254,7 +277,7 @@ func UpdateDbus(uphase *phase.SinglePhase) {
 			"Voltage":  uphase.Voltage,
 			"Exported": uphase.Exported,
 			"Imported": uphase.Imported,
-		}).Debug("New MQTT values for " + uphase.Name)
+		}).Debug("values for " + uphase.Name)
 
 		dbustools.Update(uphase.Power, "W", "/Ac/"+uphase.Name+"/Power")
 		dbustools.Update(uphase.Current, "A", "/Ac/"+uphase.Name+"/Current")
@@ -263,7 +286,9 @@ func UpdateDbus(uphase *phase.SinglePhase) {
 		dbustools.Update(uphase.Imported, "kWh", "/Ac/"+uphase.Name+"/Energy/Reverse")
 
 	}
+}
 
+func UpdateDbusGlobal() {
 	var tKw float64
 	var tImported float64
 	var tExported float64
@@ -272,6 +297,7 @@ func UpdateDbus(uphase *phase.SinglePhase) {
 		tImported += ph.Imported
 		tExported += ph.Exported
 	}
+	totalMessages++
 	log.WithFields(log.Fields{"W": tKw, "forwared": tExported, "reverse": tImported}).Debug("global Dbus update")
 	dbustools.Update(tKw, "W", "/Ac/Power")
 	dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward")
