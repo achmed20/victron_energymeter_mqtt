@@ -12,9 +12,7 @@ The goal was to make a MQTT bridge which supports all sorts of EM meters as long
 * Reactive rather then proactive
 * Use any MQTT topic as long as the subtopics are no JSON objects.
 * Will work with one phase only. L2 and L3 will just be left with default values which is still enough for the Victron.
-* Will work with only Power as input! I had a SML reader before and its only output was power, which is enough to calculate the missing values.
-  - Autogenerates `current` based on `power` and `voltage`
-  - able to set default for Voltage in case its missing
+
 
 ![Victron Overview](./.media/meter.png)
 

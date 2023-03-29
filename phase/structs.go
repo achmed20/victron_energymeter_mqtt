@@ -38,18 +38,18 @@ func (i *SinglePhase) SetByName(propName string, propValue float64) *SinglePhase
 }
 
 func (s *SinglePhase) FixValues() {
-	if s.Voltage == 0 {
-		log.Debug("Voltage missing, setting default value of 230")
-		s.Voltage = 230
-	}
+	// if s.Voltage == 0 {
+	// 	log.Trace("Voltage missing, setting default value of 230")
+	// 	s.Voltage = 230
+	// }
 	if s.Power != 0 && s.Current == 0 {
-		log.Debug("current missing, calculating value")
+		log.Trace("current missing, calculating value")
 		s.Current = s.Power / s.Voltage
 	}
-	if s.Current != 0 && s.Power == 0 {
-		log.Debug("power missing, calculating value")
-		s.Power = s.Voltage * s.Current
-	}
+	// if s.Current != 0 && s.Power == 0 {
+	// 	log.Debug("power missing, calculating value")
+	// 	s.Power = s.Voltage * s.Current
+	// }
 }
 
 func LoadConfig() {
