@@ -10,5 +10,10 @@ build:
 release:
 	zip -FSrj build.zip ./.build/* README.md
 
-copy:
-	scp .build/* root@192.168.12.205:/data
+install:
+	@ssh root@einstein "killall victron-mqtt-bridge"
+	scp .build/* root@einstein:/data
+
+update:
+	ssh root@einstein "killall victron-mqtt-bridge"
+	scp .build/victron-mqtt-bridge root@einstein:/data
