@@ -84,10 +84,18 @@ L3:
 
 # Installing
 
-1. [Download](https://github.com/achmed20/victron_energymeter_mqtt/releases) and extract `build.zip`
-2. Change the `victron-mqtt-bridge.yaml`. 
-3. Copy contents over to your device by hand (into the `/data` folder)
-4. Restart your GX device
+1. [Download](https://github.com/achmed20/victron_energymeter_mqtt/releases) and extract the latest release and extract it into `/data` or execute this script!
+```sh
+wget -c https://github.com/achmed20/victron_energymeter_mqtt/releases/latest/download/release.tgz -O - | tar -xz -C /data
+```
+2. modify the config
+```
+nano /victron-mqtt-bridge.yaml
+```
+3. Test it by starting it it manualy. If you dont get errors, and the GX UI is showing values, just reboot
+```sh
+/data/victron-mqtt-bridge
+```
 
 ## Compiling from source
 

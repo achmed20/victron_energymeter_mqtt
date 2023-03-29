@@ -8,7 +8,7 @@ build:
 	cp ./assets/* .build
 
 release:
-	zip -FSrj build.zip ./.build/* README.md
+	tar -czvf release.tgz -C .build .
 
 install:
 	@ssh root@einstein "killall victron-mqtt-bridge"
