@@ -11,6 +11,14 @@ user:
 password: 
 topic: shellies/3em/emeter/#
 
+#Victron needs im/exported totals in kWh but for me f.e. those are in Wh 
+#these values are multiplied with the aproriate value.
+#default 1
+factors:
+  imported: 0.001  #multiply imported with this value
+  Exported: 0.001  #multiply exported with this value
+
+
 L1:
   #default values if some topic is missing
   voltage: 230.0

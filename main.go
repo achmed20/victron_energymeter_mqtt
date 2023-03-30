@@ -46,9 +46,10 @@ var dryrun bool
 var totalMessages uint32
 var logInterval int32
 var updateInterval int32
+var factor map[string]float64
 
 func init() {
-	// Cache = make(map[string]phaseCache)
+	factor = make(map[string]float64)
 
 	log.SetFormatter(&log.TextFormatter{
 		// DisableColors: true,
@@ -121,6 +122,15 @@ func init() {
 	phase.LoadConfig()
 	for _, v := range phase.Lines {
 		log.Info("Configuration found for " + v.Name)
+	}
+
+	// -------- load factors -----------
+	for k, v := range viper.GetStringMap("factors") {
+		factor[k] = v.(float64)
+	}
+	if len(factor) > 0 {
+		log.Info("Factors found and loaded")
+
 	}
 }
 
@@ -257,6 +267,10 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 		ph := tmp.(phaseCache)
 		if ph.Valid {
 			log.WithField("path", msg.Topic()).Trace("cache found")
+			if fac, ok := factor[strings.ToLower(ph.Field)]; ok {
+				log.WithField("field", ph.Field).WithField("factor", fac).Trace("factor found and used")
+				payload = payload * fac
+			}
 			ph.Phase.SetByName(ph.Field, payload)
 			if ph.Field == "Power" && updateInterval == 0 {
 				UpdateDbusPhase(ph.Phase)

@@ -3,6 +3,7 @@ module victron_energymeter_mqtt
 go 1.18
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/eclipse/paho.mqtt.golang v1.4.3-0.20230316190957-aa0a8ad044fe
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/godbus/dbus/v5 v5.1.0
