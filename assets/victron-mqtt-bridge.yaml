@@ -11,6 +11,11 @@ user:
 password: 
 topic: shellies/3em/emeter/#            #base topic. the "#" will subscribe to ALL topics beneath it
 
+#factors:
+#  imported: 0.001  #multiply imported with this value
+#  Exported: 0.001  #multiply exported with this value
+
+
 # Required
 L1:
   #default values in case some topic is missing
