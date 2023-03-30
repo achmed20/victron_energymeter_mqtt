@@ -35,6 +35,13 @@ user:
 password: 
 topic: shellies/3em/emeter/#            #base topic. the "#" will subscribe to ALL topics beneath it
 
+#Victron needs im/exported totals in kWh but for me f.e. those are in Wh 
+#these values are multiplied with the aproriate value. remove if not needed
+#default 1
+factors:
+  imported: 0.001                       #multiply imported with this value
+  Exported: 0.001                       #multiply exported with this value
+
 # Required, if if you 
 L1:
   #default values in case some topic is missing

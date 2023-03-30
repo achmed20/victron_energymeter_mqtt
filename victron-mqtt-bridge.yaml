@@ -1,4 +1,4 @@
-loglevel: trace #loglevels are: "info,warn,debug,trace", remove to disable logging
+loglevel: debug #loglevels are: "info,warn,debug,trace", remove to disable logging
 loginterval: 5 #time in secods to write periodic logs. default: 3600
 updateinterval: 0 #updates to the DBUS > 0 = live on power changes, otherwhise in miliseconds
 dryrun: true #disables dbus connection, for testing only
@@ -11,10 +11,12 @@ user:
 password: 
 topic: shellies/3em/emeter/#
 
+#Victron needs im/exported totals in kWh but for me f.e. those are in Wh 
+#these values are multiplied with the aproriate value.
+#default 1
 factors:
   imported: 0.001  #multiply imported with this value
   Exported: 0.001  #multiply exported with this value
-
 
 
 L1:
