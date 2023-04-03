@@ -48,8 +48,13 @@ var logInterval int32
 var updateInterval int32
 var factor map[string]float64
 
+var validLineImported map[string]*phase.SinglePhase
+var validLineExported map[string]*phase.SinglePhase
+
 func init() {
 	factor = make(map[string]float64)
+	validLineImported = make(map[string]*phase.SinglePhase)
+	validLineExported = make(map[string]*phase.SinglePhase)
 
 	log.SetFormatter(&log.TextFormatter{
 		// DisableColors: true,
@@ -272,9 +277,16 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 				payload = payload * fac
 			}
 			ph.Phase.SetByName(ph.Field, payload)
-			if ph.Field == "Power" && updateInterval == 0 {
-				UpdateDbusPhase(ph.Phase)
-				UpdateDbusGlobal()
+			switch ph.Field {
+			case "Power":
+				if updateInterval == 0 {
+					UpdateDbusPhase(ph.Phase)
+					UpdateDbusGlobal()
+				}
+			case "Imported":
+				validLineImported[ph.Phase.Name] = ph.Phase
+			case "Exported":
+				validLineExported[ph.Phase.Name] = ph.Phase
 			}
 		}
 	}
@@ -303,19 +315,27 @@ func UpdateDbusPhase(uphase *phase.SinglePhase) {
 }
 
 func UpdateDbusGlobal() {
+
 	var tKw float64
 	var tImported float64
 	var tExported float64
 	for _, ph := range phase.Lines {
 		tKw += ph.Power
-		tImported += ph.Imported
 		tExported += ph.Exported
+		tImported += ph.Imported
 	}
+
 	totalMessages++
-	log.WithFields(log.Fields{"W": tKw, "forwared": tExported, "reverse": tImported}).Debug("global Dbus update")
 	dbustools.Update(tKw, "W", "/Ac/Power")
-	dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward")
-	dbustools.Update(tImported, "kWh", "/Ac/Energy/Reverse")
+	log.WithFields(log.Fields{"W": tKw}).Debug("global Dbus update")
+	if len(validLineImported) >= len(phase.Lines) {
+		dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward") //imported from grid
+		log.WithFields(log.Fields{"forwared": tImported}).Debug("global Dbus update")
+	}
+	if len(validLineExported) >= len(phase.Lines) {
+		dbustools.Update(tImported, "kWh", "/Ac/Energy/Reverse") //sold to grid
+		log.WithFields(log.Fields{"reverse": tExported}).Debug("global Dbus update")
+	}
 
 }
 
