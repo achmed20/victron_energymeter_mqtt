@@ -31,11 +31,11 @@ phases:
     exported: 0.0
     #relative from topic
     topics:
-      Power: 0/power 
-      Voltage: 0/voltage
-      Current: 0/current
-      Imported: 0/total
-      Exported: 0/total_returned
+      Power: 2/power 
+      Voltage: 2/voltage
+      Current: 2/current
+      Imported: 2/total
+      Exported: 2/total_returned
 
   - name: L2
     voltage: 230.0
@@ -57,9 +57,9 @@ phases:
     imported: 0.0
     exported: 0.0
     topics:
-      Power: 2/power
-      Voltage: 2/voltage
-      Current: 2/current
-      Imported: 2/total
-      Exported: 2/total_returned
+      Power: 0/power
+      Voltage: 0/voltage
+      Current: 0/current
+      Imported: 0/total
+      Exported: 0/total_returned
 

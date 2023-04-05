@@ -153,10 +153,7 @@ func loadConfig() {
 
 	// -------- setup phases -----------
 	phase.Lines = Config.Phases
-	// phase.LoadConfig()
-	// for _, v := range phase.Lines {
-	// 	log.Info("Configuration found for " + v.Name)
-	// }
+	Cache = sync.Map{}
 }
 
 /* Convert binary to float64 */
