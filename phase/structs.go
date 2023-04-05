@@ -11,21 +11,21 @@ import (
 var Lines []SinglePhase
 
 type Topics struct {
-	Voltage  string
-	Current  string
-	Power    string
-	Imported string
-	Exported string
+	Voltage  string `json:"voltage,omitempty"`
+	Current  string `json:"current,omitempty"`
+	Power    string `json:"power,omitempty"`
+	Imported string `json:"imported,omitempty"`
+	Exported string `json:"exported,omitempty"`
 }
 type SinglePhase struct {
-	Name     string
-	Voltage  float64 // Volts: 230,0
-	Current  float64 // Amps: 8,3
-	Power    float64 // Watts: 1909
-	Imported float64 // kWh, purchased power
-	Exported float64 // kWh, sold power
+	Name     string  `json:"name,omitempty"`
+	Voltage  float64 `json:"voltage,omitempty"`  // Volts: 230,0
+	Current  float64 `json:"current,omitempty"`  // Amps: 8,3
+	Power    float64 `json:"power,omitempty"`    // Watts: 1909
+	Imported float64 `json:"imported,omitempty"` // kWh, purchased power
+	Exported float64 `json:"exported,omitempty"` // kWh, sold power
 
-	Topics Topics
+	Topics Topics `json:"topics,omitempty"`
 }
 
 func init() {

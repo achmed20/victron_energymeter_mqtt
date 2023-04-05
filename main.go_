@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	vc "victron_energymeter_mqtt/config"
 	"victron_energymeter_mqtt/dbustools"
 	"victron_energymeter_mqtt/phase"
 
@@ -23,10 +22,17 @@ import (
 )
 
 /* Configuration */
-var Config vc.Config
+var (
+	BROKER    = "192.168.1.119"
+	PORT      = 1883
+	TOPIC     = "stromzaehler/#"
+	CLIENT_ID = "sdm630-bridge"
+	USERNAME  = "user"
+	PASSWORD  = "pass"
+	DevideBy  = 1
+)
 
 var Cache sync.Map
-var totalMessages int
 
 // [string]phaseCache
 
@@ -36,10 +42,17 @@ type phaseCache struct {
 	Phase *phase.SinglePhase
 }
 
+var dryrun bool
+var totalMessages uint32
+var logInterval int32
+var updateInterval int32
+var factor map[string]float64
+
 var validLineImported map[string]*phase.SinglePhase
 var validLineExported map[string]*phase.SinglePhase
 
 func init() {
+	factor = make(map[string]float64)
 	validLineImported = make(map[string]*phase.SinglePhase)
 	validLineExported = make(map[string]*phase.SinglePhase)
 
@@ -58,16 +71,31 @@ func init() {
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
-	Config.SetDefaults()
-	viper.Unmarshal(&Config)
-	Config.FixValues()
+	viper.SetDefault("debug", false)
+	viper.SetDefault("broker", "192.168.1.1")
+	viper.SetDefault("port", 1883)
+	viper.SetDefault("client_id", "victron-em-bridge")
+	viper.SetDefault("user", "")
+	viper.SetDefault("password", "")
+	viper.SetDefault("topic", "stromzaehler/#")
 
-	if Config.DryRun {
+	viper.SetDefault("phases", 3)
+
+	BROKER = viper.GetString("broker")
+	PORT = viper.GetInt("port")
+	TOPIC = viper.GetString("topic")
+	CLIENT_ID = viper.GetString("client_id")
+	USERNAME = viper.GetString("user")
+	PASSWORD = viper.GetString("password")
+
+	//-----------------------------
+
+	if viper.GetBool("dryrun") {
 		log.Warn("dry run / dbus disabled")
 		dbustools.DryRun = true
 	}
 
-	switch Config.Logging.Level {
+	switch viper.GetString("loglevel") {
 	case "info":
 		log.SetLevel(log.InfoLevel)
 		break
@@ -84,28 +112,50 @@ func init() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	log.Info(fmt.Sprintf("log interval set to %d", Config.Updates))
+	updateInterval = viper.GetInt32("updateinterval")
+	if updateInterval < 250 && updateInterval != 0 {
+		updateInterval = 250
+	}
+
+	logInterval = viper.GetInt32("loginterval")
+	if logInterval == 0 {
+		logInterval = 3600
+	}
+	log.Info(fmt.Sprintf("log interval set to %d", logInterval))
 
 	// -------- setup phases -----------
-	phase.Lines = Config.Phases
-	// phase.LoadConfig()
-	// for _, v := range phase.Lines {
-	// 	log.Info("Configuration found for " + v.Name)
-	// }
+	phase.LoadConfig()
+	for _, v := range phase.Lines {
+		log.Info("Configuration found for " + v.Name)
+	}
+
+	// -------- load factors -----------
+	for k, v := range viper.GetStringMap("factors") {
+		factor[k] = v.(float64)
+	}
+	if len(factor) > 0 {
+		log.Info("Factors found and loaded")
+
+	}
 }
 
 func main() {
 	dbustools.Connect()
 	defer dbustools.Close()
 
-	log.Info("Successfully connected to dbus")
+	// mqtt.ERROR = llog.New(os.Stdout, "[ERROR] ", 0)
+	// mqtt.CRITICAL = llog.New(os.Stdout, "[CRIT] ", 0)
+	// mqtt.WARN = llog.New(os.Stdout, "[WARN]  ", 0)
+	// mqtt.DEBUG = llog.New(os.Stdout, "[DEBUG] ", 0)
+
+	log.Info("Successfully connected to dbus and registered as a '" + CLIENT_ID + "'")
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
 	opts.SetOrderMatters(false) //important or it will crash
-	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", Config.Mqtt.Broker, Config.Mqtt.Port))
-	opts.SetClientID(Config.Name + RandomString(10))
-	opts.SetUsername(Config.Mqtt.User)
-	opts.SetPassword(Config.Mqtt.Password)
+	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", BROKER, PORT))
+	opts.SetClientID(CLIENT_ID + RandomString(10))
+	opts.SetUsername(USERNAME)
+	opts.SetPassword(PASSWORD)
 	opts.SetDefaultPublishHandler(messageHandler) //func that handles all messages
 	opts.OnConnect = connectHandler
 	opts.OnConnectionLost = connectLostHandler
@@ -114,23 +164,24 @@ func main() {
 		log.WithField("error", token.Error()).Panic("could not connect to MQTT server")
 	}
 	func(client mqtt.Client) {
-		token := client.Subscribe(Config.Mqtt.Topic, 1, nil)
+		topic := TOPIC
+		token := client.Subscribe(topic, 1, nil)
 		token.Wait()
-		log.Info("Subscribed to topic: " + Config.Mqtt.Topic)
+		log.Info("Subscribed to topic: " + topic)
 	}(client)
 
 	go func() {
-		logTicker := time.NewTicker(time.Second * time.Duration(Config.Logging.Interval))
+		logTicker := time.NewTicker(time.Second * time.Duration(logInterval))
 		for _ = range logTicker.C {
 			log.WithField("updates_sent", totalMessages).Info("still allive")
 			totalMessages = 0
 		}
 	}()
 
-	if Config.Updates > 0 {
+	if updateInterval > 0 {
 		go func() {
-			updateTicker := time.NewTicker(time.Millisecond * time.Duration(Config.Updates))
-			log.WithField("ms", Config.Updates).Info("update interval set to delayed")
+			updateTicker := time.NewTicker(time.Millisecond * time.Duration(updateInterval))
+			log.WithField("ms", updateInterval).Info("update interval set to delayed")
 			for _ = range updateTicker.C {
 				for _, ph := range phase.Lines {
 					UpdateDbusPhase(&ph)
@@ -139,7 +190,7 @@ func main() {
 			}
 		}()
 	} else {
-		log.WithField("ms", Config.Updates).Info("update interval set to LIVE")
+		log.WithField("ms", updateInterval).Info("update interval set to LIVE")
 	}
 
 	// Wait for ctrl+c
@@ -164,13 +215,14 @@ func bin2Float64(bin string) float64 {
 
 /* Called if connection is established */
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	log.Info(fmt.Sprintf("Connected to broker"))
+	log.Info(fmt.Sprintf("Connected to broker %s:%d", BROKER, PORT))
 }
 
 /* Called if connection is lost  */
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
 	//panic and let the script restart
 	log.Panic(fmt.Sprintf("Connect lost: %v", err))
+	//os.Exit(1)
 }
 
 /* Search for string with regex */
@@ -220,17 +272,14 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 		ph := tmp.(phaseCache)
 		if ph.Valid {
 			log.WithField("path", msg.Topic()).Trace("cache found")
-
-			//TODO: factor wieder einbauen
-			// if fac, ok := factor[strings.ToLower(ph.Field)]; ok {
-			// 	log.WithField("field", ph.Field).WithField("factor", fac).Trace("factor found and used")
-			// 	payload = payload * fac
-			// }
-
+			if fac, ok := factor[strings.ToLower(ph.Field)]; ok {
+				log.WithField("field", ph.Field).WithField("factor", fac).Trace("factor found and used")
+				payload = payload * fac
+			}
 			ph.Phase.SetByName(ph.Field, payload)
 			switch ph.Field {
 			case "Power":
-				if Config.Updates == 0 {
+				if updateInterval == 0 {
 					UpdateDbusPhase(ph.Phase)
 					UpdateDbusGlobal()
 				}
