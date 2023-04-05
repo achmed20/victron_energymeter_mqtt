@@ -221,11 +221,13 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 		if ph.Valid {
 			log.WithField("path", msg.Topic()).Trace("cache found")
 
-			//TODO: factor wieder einbauen
-			// if fac, ok := factor[strings.ToLower(ph.Field)]; ok {
-			// 	log.WithField("field", ph.Field).WithField("factor", fac).Trace("factor found and used")
-			// 	payload = payload * fac
-			// }
+			//handle Factors
+			switch ph.Field {
+			case "Imported":
+				payload = payload * Config.Factors.Imported
+			case "Exported":
+				payload = payload * Config.Factors.Exported
+			}
 
 			ph.Phase.SetByName(ph.Field, payload)
 			switch ph.Field {
