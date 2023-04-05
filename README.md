@@ -22,69 +22,45 @@ The goal was to make a MQTT bridge which supports all sorts of EM meters as long
 
 You need to change the default values in the `victron-mqtt-bridge.yaml` file:
 ```yaml
-loglevel: trace                         #loglevels are: "info,warn,debug,trace", remove to disable logging
-loginterval: 3600                       #time in secods to write periodic logs. default: 3600
-updateinterval: 0 #updates to the DBUS > 0 = live on power changes, otherwhise in miliseconds
-#dryrun: true                           #disables dbus connection, for testing only
-client_id: "victron-3em-bridge"         #Name inside Victron
 
-#mqtt config, most likley the only thing you need to change
-broker: 192.168.12.200
-port: 1883
-user: 
-password: 
-topic: shellies/3em/emeter/#            #base topic. the "#" will subscribe to ALL topics beneath it
+updates: 0 #updates to the DBUS > 0 = live on power changes, otherwhise in miliseconds
+dryrun: false #disables dbus connection, for testing only
+name: "victron-3em-bridge"
+
+logging:
+  level: debug #loglevels are: "info,warn,debug,trace", remove to disable logging
+  interval: 5 #time in secods to write periodic logs. default: 3600
+
+mqtt:
+  broker: 192.168.12.200
+  port: 1883
+  user: 
+  password: 
+  topic: shellies/3em/emeter/#
 
 #Victron needs im/exported totals in kWh but for me f.e. those are in Wh 
-#these values are multiplied with the aproriate value. remove if not needed
+#these values are multiplied with the aproriate value.
 #default 1
 factors:
-  imported: 0.001                       #multiply imported with this value
-  Exported: 0.001                       #multiply exported with this value
+  imported: 0.001  #multiply imported with this value
+  exported: 0.001  #multiply exported with this value
 
-# Required, if if you 
-L1:
-  #default values in case some topic is missing
-  voltage: 230.0
-  current: 0.0
-  power: 0.0
-  imported: 0.0
-  exported: 0.0
-  #relative path from topic, just write "something" if it's unassigned
-  topic:
-    Power: 0/power                      #will result in 'shellies/3em/emeter/0/power'   
-    Voltage: 0/voltage                  #...
-    Current: 0/current
-    Imported: 0/total
-    Exported: 0/total_returned
-
-#Remove if you only have 1 phase to track
-L2:
-  voltage: 230.0
-  current: 0.0
-  power: 0.0
-  imported: 0.0
-  exported: 0.0
-  topic:
-    Power: 1/power
-    Voltage: 1/voltage
-    Current: 1/current
-    Imported: 1/total
-    Exported: 1/total_returned
-
-#Remove if you only have 1 phase to track
-L3:
-  voltage: 230.0
-  current: 0.0
-  power: 0.0
-  imported: 0.0
-  exported: 0.0
-  topic:
-    Power: 2/power
-    Voltage: 2/voltage
-    Current: 2/current
-    Imported: 2/total
-    Exported: 2/total_returned
+phases:
+  - name: L1
+    #default values if some topic is missing
+    voltage: 230.0
+    current: 0.0
+    power: 0.0
+    imported: 0.0
+    exported: 0.0
+    #relative from topic
+    topics:
+      Power: 0/power 
+      Voltage: 0/voltage
+      Current: 0/current
+      Imported: 0/total
+      Exported: 0/total_returned
+  ...
 ```
 
 # Installing

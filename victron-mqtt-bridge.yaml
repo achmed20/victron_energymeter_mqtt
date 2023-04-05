@@ -21,7 +21,7 @@ factors:
   imported: 0.001  #multiply imported with this value
   exported: 0.001  #multiply exported with this value
 
-Phases:
+phases:
   - name: L1
     #default values if some topic is missing
     voltage: 230.0
@@ -29,7 +29,7 @@ Phases:
     power: 0.0
     imported: 0.0
     exported: 0.0
-    #relative from topic, just write "something" is unassigned
+    #relative from topic
     topics:
       Power: 0/power 
       Voltage: 0/voltage
