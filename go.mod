@@ -3,7 +3,9 @@ module victron_energymeter_mqtt
 go 1.18
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/eclipse/paho.mqtt.golang v1.4.3-0.20230316190957-aa0a8ad044fe
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/sirupsen/logrus v1.9.0
@@ -11,7 +13,6 @@ require (
 )
 
 require (
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect

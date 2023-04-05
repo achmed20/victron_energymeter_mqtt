@@ -18,6 +18,7 @@ import (
 	"victron_energymeter_mqtt/phase"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -53,47 +54,20 @@ func init() {
 	viper.AddConfigPath("/etc")                // path to look for the config file in
 	viper.AddConfigPath("/data")               // optionally look for config in the working directory
 	viper.AddConfigPath(".")                   // optionally look for config in the working directory
-	err := viper.ReadInConfig()                // Find and read the config file
-	if err != nil {                            // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
-	}
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Info("Config changed!")
+		loadConfig()
+	})
+	viper.WatchConfig()
 
 	Config.SetDefaults()
-	viper.Unmarshal(&Config)
-	Config.FixValues()
+	loadConfig()
 
-	if Config.DryRun {
-		log.Warn("dry run / dbus disabled")
-		dbustools.DryRun = true
-	}
-
-	switch Config.Logging.Level {
-	case "info":
-		log.SetLevel(log.InfoLevel)
-	case "debug":
-		log.SetLevel(log.DebugLevel)
-	case "warn":
-		log.SetLevel(log.WarnLevel)
-	case "trace":
-		log.SetLevel(log.TraceLevel)
-	default:
-		log.SetOutput(ioutil.Discard)
-	}
-
-	log.Info(fmt.Sprintf("log interval set to %d", Config.Updates))
-
-	// -------- setup phases -----------
-	phase.Lines = Config.Phases
-	// phase.LoadConfig()
-	// for _, v := range phase.Lines {
-	// 	log.Info("Configuration found for " + v.Name)
-	// }
 }
 
 func main() {
 	dbustools.Connect()
 	defer dbustools.Close()
-
 	log.Info("Successfully connected to dbus")
 	// MQTT Subscripte
 	opts := mqtt.NewClientOptions()
@@ -147,6 +121,43 @@ func main() {
 }
 
 // ------------------------------------------------------------------------------------
+
+func loadConfig() {
+	err := viper.ReadInConfig() // Find and read the config file
+	if err != nil {             // Handle errors reading the config file
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
+
+	viper.Unmarshal(&Config)
+	Config.FixValues()
+
+	if Config.DryRun {
+		log.Warn("dry run / dbus disabled")
+		dbustools.DryRun = true
+	}
+
+	switch Config.Logging.Level {
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+	case "trace":
+		log.SetLevel(log.TraceLevel)
+	default:
+		log.SetOutput(ioutil.Discard)
+	}
+
+	log.Info(fmt.Sprintf("log interval set to %d", Config.Updates))
+
+	// -------- setup phases -----------
+	phase.Lines = Config.Phases
+	// phase.LoadConfig()
+	// for _, v := range phase.Lines {
+	// 	log.Info("Configuration found for " + v.Name)
+	// }
+}
 
 /* Convert binary to float64 */
 func bin2Float64(bin string) float64 {
@@ -290,7 +301,7 @@ func UpdateDbusGlobal() {
 
 func RandomString(n int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
+	rand.Seed(time.Now().UnixNano())
 	s := make([]rune, n)
 	for i := range s {
 		s[i] = letters[rand.Intn(len(letters))]
