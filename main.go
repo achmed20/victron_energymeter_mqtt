@@ -70,16 +70,12 @@ func init() {
 	switch Config.Logging.Level {
 	case "info":
 		log.SetLevel(log.InfoLevel)
-		break
 	case "debug":
 		log.SetLevel(log.DebugLevel)
-		break
 	case "warn":
 		log.SetLevel(log.WarnLevel)
-		break
 	case "trace":
 		log.SetLevel(log.TraceLevel)
-		break
 	default:
 		log.SetOutput(ioutil.Discard)
 	}
