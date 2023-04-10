@@ -37,10 +37,12 @@ type phaseCache struct {
 	Phase *phase.SinglePhase
 }
 
+var validLinePower map[string]*phase.SinglePhase
 var validLineImported map[string]*phase.SinglePhase
 var validLineExported map[string]*phase.SinglePhase
 
 func init() {
+	validLinePower = make(map[string]*phase.SinglePhase)
 	validLineImported = make(map[string]*phase.SinglePhase)
 	validLineExported = make(map[string]*phase.SinglePhase)
 
@@ -236,6 +238,7 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			ph.Phase.SetByName(ph.Field, payload)
 			switch ph.Field {
 			case "Power":
+				validLinePower[ph.Phase.Name] = ph.Phase
 				if Config.Updates == 0 {
 					UpdateDbusPhase(ph.Phase)
 					UpdateDbusGlobal()
@@ -272,26 +275,55 @@ func UpdateDbusPhase(uphase *phase.SinglePhase) {
 }
 
 func UpdateDbusGlobal() {
-
-	var tKw float64
+	var tPower float64
 	var tImported float64
 	var tExported float64
-	for _, ph := range phase.Lines {
-		tKw += ph.Power
-		tExported += ph.Exported
-		tImported += ph.Imported
-	}
 
-	totalMessages++
-	dbustools.Update(tKw, "W", "/Ac/Power")
-	log.WithFields(log.Fields{"W": tKw}).Debug("global Dbus update")
-	if len(validLineImported) >= len(phase.Lines) {
-		dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward") //imported from grid
-		log.WithFields(log.Fields{"forwared": tImported}).Debug("global Dbus update")
-	}
-	if len(validLineExported) >= len(phase.Lines) {
-		dbustools.Update(tImported, "kWh", "/Ac/Energy/Reverse") //sold to grid
-		log.WithFields(log.Fields{"reverse": tExported}).Debug("global Dbus update")
+	if Config.CalcNetPower {
+		if len(validLinePower) >= len(phase.Lines) {
+			// tNow := time.Now()
+			for _, v := range validLinePower {
+				tPower += v.Power
+			}
+			dbustools.Update(tPower, "W", "/Ac/Power")
+			log.WithFields(log.Fields{"W": tPower}).Debug("global Dbus update")
+
+			if tPower > 0 {
+				tImported = tPower / (60 * 60 / 0.5 * 1000)
+				dbustools.Update(tImported, "kWh", "/Ac/Energy/Forward") //imported from grid
+				log.WithFields(log.Fields{"forwared": tImported}).Debug("global Dbus update")
+			}
+			if tPower < 0 {
+				tExported = tPower * -1 / (60 * 60 / 0.5 * 1000)
+				dbustools.Update(tExported, "kWh", "/Ac/Energy/Reverse") //imported from grid
+				log.WithFields(log.Fields{"exported": tImported}).Debug("global Dbus update")
+			}
+
+			// spew.Dump(validLinePower)
+			// if (self._dbusservice['/Ac/Power'] > 0):
+			//     self._dbusservice['/Ac/Energy/Forward'] = self._dbusservice['/Ac/Energy/Forward'] + (self._dbusservice['/Ac/Power']/(60*60/0.5*1000))
+			// if (self._dbusservice['/Ac/Power'] < 0):
+			// 	self._dbusservice['/Ac/Energy/Reverse'] = self._dbusservice['/Ac/Energy/Reverse'] + (self._dbusservice['/Ac/Power']*-1/(60*60/0.5*1000))
+
+		}
+	} else {
+		for _, ph := range phase.Lines {
+			tPower += ph.Power
+			tExported += ph.Exported
+			tImported += ph.Imported
+		}
+
+		totalMessages++
+		dbustools.Update(tPower, "W", "/Ac/Power")
+		log.WithFields(log.Fields{"W": tPower}).Debug("global Dbus update")
+		if len(validLineImported) >= len(phase.Lines) {
+			dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward") //imported from grid
+			log.WithFields(log.Fields{"forwared": tImported}).Debug("global Dbus update")
+		}
+		if len(validLineExported) >= len(phase.Lines) {
+			dbustools.Update(tImported, "kWh", "/Ac/Energy/Reverse") //sold to grid
+			log.WithFields(log.Fields{"reverse": tExported}).Debug("global Dbus update")
+		}
 	}
 
 }

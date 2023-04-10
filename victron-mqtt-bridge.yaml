@@ -21,6 +21,8 @@ factors:
   imported: 0.001  #multiply imported with this value
   exported: 0.001  #multiply exported with this value
 
+CalcNetPower: true  #Calculate forward and reverse values and dont use sumarized phase values
+
 phases:
   - name: L1
     #default values if some topic is missing

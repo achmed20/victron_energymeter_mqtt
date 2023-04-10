@@ -2,10 +2,9 @@ package phase
 
 import (
 	"reflect"
-	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 var Lines []SinglePhase
@@ -26,6 +25,8 @@ type SinglePhase struct {
 	Exported float64 `json:"exported,omitempty"` // kWh, sold power
 
 	Topics Topics `json:"topics,omitempty"`
+
+	lastPowerUpdate time.Time
 }
 
 func init() {
@@ -34,7 +35,14 @@ func init() {
 
 func (i *SinglePhase) SetByName(propName string, propValue float64) *SinglePhase {
 	reflect.ValueOf(i).Elem().FieldByName(propName).Set(reflect.ValueOf(propValue))
+	if propName == "Power" {
+		i.lastPowerUpdate = time.Now()
+	}
 	return i
+}
+
+func (i *SinglePhase) GetLastPowerUpdate() *time.Time {
+	return &i.lastPowerUpdate
 }
 
 func (s *SinglePhase) FixValues() {
@@ -50,45 +58,4 @@ func (s *SinglePhase) FixValues() {
 	// 	log.Debug("power missing, calculating value")
 	// 	s.Power = s.Voltage * s.Current
 	// }
-}
-
-func LoadConfig() {
-	for i := 1; i < 10; i++ {
-		var lineName = "l" + strconv.Itoa(i)
-		var lineVals = viper.GetStringMap(lineName)
-		log.Trace("getting config for " + lineName)
-		if len(lineVals) == 0 && lineName == "l1" {
-			log.Panic("at least L1 required in config")
-		} else if len(lineVals) == 0 {
-			log.Trace("no more sequential Lines configured")
-			return //no more configs
-		}
-
-		if len(lineVals) == 0 {
-			Lines = append(Lines, SinglePhase{
-				Name:    "L" + strconv.Itoa(i),
-				Voltage: Lines[0].Voltage,
-			})
-		} else {
-			topics := lineVals["topic"].(map[string]interface{})
-			Lines = append(Lines, SinglePhase{
-				Name:     "L" + strconv.Itoa(i),
-				Voltage:  lineVals["voltage"].(float64),
-				Current:  lineVals["current"].(float64),
-				Power:    lineVals["power"].(float64),
-				Imported: lineVals["imported"].(float64),
-				Exported: lineVals["exported"].(float64),
-
-				Topics: Topics{
-					Voltage:  topics["voltage"].(string),
-					Power:    topics["power"].(string),
-					Current:  topics["current"].(string),
-					Imported: topics["imported"].(string),
-					Exported: topics["exported"].(string),
-				},
-			})
-		}
-
-	}
-
 }
