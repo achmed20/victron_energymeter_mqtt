@@ -41,8 +41,8 @@ func (i *SinglePhase) SetByName(propName string, propValue float64) *SinglePhase
 	return i
 }
 
-func (i *SinglePhase) GetLastPowerUpdate() *time.Time {
-	return &i.lastPowerUpdate
+func (i SinglePhase) GetLastPowerUpdate() time.Time {
+	return i.lastPowerUpdate
 }
 
 func (s *SinglePhase) FixValues() {
