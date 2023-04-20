@@ -152,7 +152,7 @@ func loadConfig() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	log.Info(fmt.Sprintf("log interval set to %d", Config.Updates))
+	log.Info(fmt.Sprintf("log interval set to %d", Config.Logging.Interval))
 
 	// -------- setup phases -----------
 	phase.Lines = Config.Phases
@@ -255,7 +255,6 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 
 func UpdateDbusPhase(uphase *phase.SinglePhase) {
 	if uphase != nil {
-		totalMessages++
 		log.WithFields(log.Fields{
 			"Phase":    uphase.Name,
 			"Power":    uphase.Power,
@@ -270,7 +269,7 @@ func UpdateDbusPhase(uphase *phase.SinglePhase) {
 		dbustools.Update(uphase.Voltage, "V", "/Ac/"+uphase.Name+"/Voltage")
 		dbustools.Update(uphase.Exported, "kWh", "/Ac/"+uphase.Name+"/Energy/Forward")
 		dbustools.Update(uphase.Imported, "kWh", "/Ac/"+uphase.Name+"/Energy/Reverse")
-
+		totalMessages++
 	}
 }
 

@@ -2,6 +2,7 @@
 updates: 0 #updates to the DBUS > 0 = live on power changes, otherwhise in miliseconds
 dryrun: false #disables dbus connection, for testing only
 name: "victron-3em-bridge"
+CheckForUpdates: true #kills itself if no MQTT updates during the during logging interval apear
 
 logging:
   level: info #loglevels are: "info,warn,debug,trace", remove to disable logging
