@@ -5,9 +5,10 @@ import (
 )
 
 type Config struct {
-	Updates int
-	DryRun  bool
-	Name    string
+	Updates         int
+	DryRun          bool
+	Name            string
+	CheckForUpdates bool
 
 	Logging LogConfig
 	Mqtt    MqttConfig

@@ -26,10 +26,11 @@ You need to change the default values in the `victron-mqtt-bridge.yaml` file:
 updates: 0 #updates to the DBUS > 0 = live on power changes, otherwhise in miliseconds
 dryrun: false #disables dbus connection, for testing only
 name: "victron-3em-bridge"
+CheckForUpdates: true #kills itself if no MQTT updates during the during logging interval apear
 
 logging:
   level: debug #loglevels are: "info,warn,debug,trace", remove to disable logging
-  interval: 5 #time in secods to write periodic logs. default: 3600
+  interval: 300 #time in secods to write periodic logs. default: 3600
 
 mqtt:
   broker: 192.168.12.200

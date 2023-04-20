@@ -92,6 +92,9 @@ func main() {
 	go func() {
 		logTicker := time.NewTicker(time.Second * time.Duration(Config.Logging.Interval))
 		for _ = range logTicker.C {
+			if Config.CheckForUpdates && totalMessages == 0 {
+				log.Fatal("No updates from MQTT topic. something is off ...")
+			}
 			log.WithField("updates_sent", totalMessages).Info("still allive")
 			totalMessages = 0
 		}
