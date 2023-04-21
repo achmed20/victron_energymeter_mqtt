@@ -28,6 +28,7 @@ var Config vc.Config
 
 var Cache sync.Map
 var totalMessages int
+var dbusLock sync.Mutex
 
 // [string]phaseCache
 
@@ -254,6 +255,8 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 }
 
 func UpdateDbusPhase(uphase *phase.SinglePhase) {
+	dbusLock.Lock()
+	defer dbusLock.Unlock()
 	if uphase != nil {
 		log.WithFields(log.Fields{
 			"Phase":    uphase.Name,
