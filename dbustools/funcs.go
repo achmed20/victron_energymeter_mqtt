@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/godbus/dbus/introspect"
 	"github.com/godbus/dbus/v5"
 	log "github.com/sirupsen/logrus"
@@ -269,7 +268,8 @@ func Worker(ctx context.Context) {
 		if ok == false {
 			break
 		}
-		spew.Dump(v)
+		Update(v.Value, v.Unit, v.Path)
+		// spew.Dump(v)
 	}
 
 }
