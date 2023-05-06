@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -42,6 +43,7 @@ var validLineImported map[string]*phase.SinglePhase
 var validLineExported map[string]*phase.SinglePhase
 
 func init() {
+
 	validLineImported = make(map[string]*phase.SinglePhase)
 	validLineExported = make(map[string]*phase.SinglePhase)
 
@@ -114,6 +116,7 @@ func main() {
 		}()
 	} else {
 		log.WithField("ms", Config.Updates).Info("update interval set to LIVE")
+		go dbustools.Worker(context.Background())
 	}
 
 	// Wait for ctrl+c
@@ -267,11 +270,11 @@ func UpdateDbusPhase(uphase *phase.SinglePhase) {
 			"Imported": uphase.Imported,
 		}).Debug("values for " + uphase.Name)
 
-		dbustools.Update(uphase.Power, "W", "/Ac/"+uphase.Name+"/Power")
-		dbustools.Update(uphase.Current, "A", "/Ac/"+uphase.Name+"/Current")
-		dbustools.Update(uphase.Voltage, "V", "/Ac/"+uphase.Name+"/Voltage")
-		dbustools.Update(uphase.Exported, "kWh", "/Ac/"+uphase.Name+"/Energy/Forward")
-		dbustools.Update(uphase.Imported, "kWh", "/Ac/"+uphase.Name+"/Energy/Reverse")
+		dbustools.Queue(uphase.Power, "W", "/Ac/"+uphase.Name+"/Power")
+		dbustools.Queue(uphase.Current, "A", "/Ac/"+uphase.Name+"/Current")
+		dbustools.Queue(uphase.Voltage, "V", "/Ac/"+uphase.Name+"/Voltage")
+		dbustools.Queue(uphase.Exported, "kWh", "/Ac/"+uphase.Name+"/Energy/Forward")
+		dbustools.Queue(uphase.Imported, "kWh", "/Ac/"+uphase.Name+"/Energy/Reverse")
 		totalMessages++
 	}
 }
@@ -288,14 +291,14 @@ func UpdateDbusGlobal() {
 	}
 
 	totalMessages++
-	dbustools.Update(tKw, "W", "/Ac/Power")
+	dbustools.Queue(tKw, "W", "/Ac/Power")
 	log.WithFields(log.Fields{"W": tKw}).Debug("global Dbus update")
 	if len(validLineImported) >= len(phase.Lines) {
-		dbustools.Update(tExported, "kWh", "/Ac/Energy/Forward") //imported from grid
+		dbustools.Queue(tExported, "kWh", "/Ac/Energy/Forward") //imported from grid
 		log.WithFields(log.Fields{"forwared": tImported}).Debug("global Dbus update")
 	}
 	if len(validLineExported) >= len(phase.Lines) {
-		dbustools.Update(tImported, "kWh", "/Ac/Energy/Reverse") //sold to grid
+		dbustools.Queue(tImported, "kWh", "/Ac/Energy/Reverse") //sold to grid
 		log.WithFields(log.Fields{"reverse": tExported}).Debug("global Dbus update")
 	}
 

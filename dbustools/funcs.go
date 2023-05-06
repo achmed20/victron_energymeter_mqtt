@@ -1,11 +1,13 @@
 package dbustools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/godbus/dbus/introspect"
 	"github.com/godbus/dbus/v5"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +15,13 @@ import (
 
 var conn, _ = dbus.SystemBus()
 var DryRun bool
+var dbusChan chan dbusMsg
+
+type dbusMsg struct {
+	Value float64
+	Path  string
+	Unit  string
+}
 
 type objectpath string
 
@@ -41,6 +50,10 @@ const intro = `
       <arg direction="out" type="v" />
     </method>
     </interface>` + introspect.IntrospectDataString + `</node> `
+
+func init() {
+	dbusChan = make(chan dbusMsg)
+}
 
 func (f objectpath) GetValue() (dbus.Variant, *dbus.Error) {
 	log.Debug("GetValue() called for ", f)
@@ -237,4 +250,26 @@ func Update(value float64, unit string, path string) (err error) {
 
 	}
 	return
+}
+
+/* Write dbus Values to Victron handler */
+func Queue(value float64, unit string, path string) (err error) {
+	dbmsg := dbusMsg{
+		Value: value,
+		Unit:  unit,
+		Path:  path,
+	}
+	dbusChan <- dbmsg
+	return
+}
+
+func Worker(ctx context.Context) {
+	for {
+		v, ok := <-dbusChan
+		if ok == false {
+			break
+		}
+		spew.Dump(v)
+	}
+
 }
