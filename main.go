@@ -29,7 +29,6 @@ var Config vc.Config
 
 var Cache sync.Map
 var totalMessages int
-var dbusLock sync.Mutex
 
 // [string]phaseCache
 
@@ -116,8 +115,8 @@ func main() {
 		}()
 	} else {
 		log.WithField("ms", Config.Updates).Info("update interval set to LIVE")
-		go dbustools.Worker(context.Background())
 	}
+	go dbustools.Worker(context.Background())
 
 	// Wait for ctrl+c
 	done := make(chan os.Signal, 1)
@@ -243,14 +242,18 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			ph.Phase.SetByName(ph.Field, payload)
 			switch ph.Field {
 			case "Power":
-				if Config.Updates == 0 {
-					UpdateDbusPhase(ph.Phase)
-					UpdateDbusGlobal()
-				}
-			case "Imported":
-				validLineImported[ph.Phase.Name] = ph.Phase
+				dbustools.Queue(ph.Phase.Power, "W", "/Ac/"+ph.Phase.Name+"/Power")
+				UpdateDbusGlobal()
+			case "Voltage":
+				dbustools.Queue(ph.Phase.Voltage, "W", "/Ac/"+ph.Phase.Name+"/Voltage")
+			case "Current":
+				dbustools.Queue(ph.Phase.Current, "W", "/Ac/"+ph.Phase.Name+"/Current")
 			case "Exported":
-				validLineExported[ph.Phase.Name] = ph.Phase
+				dbustools.Queue(ph.Phase.Exported, "W", "/Ac/"+ph.Phase.Name+"/Energy/Forward")
+				// UpdateDbusGlobal()
+			case "Imported":
+				dbustools.Queue(ph.Phase.Imported, "W", "/Ac/"+ph.Phase.Name+"/Energy/Reverse")
+				// UpdateDbusGlobal()
 			}
 		}
 	}
@@ -258,8 +261,6 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 }
 
 func UpdateDbusPhase(uphase *phase.SinglePhase) {
-	dbusLock.Lock()
-	defer dbusLock.Unlock()
 	if uphase != nil {
 		log.WithFields(log.Fields{
 			"Phase":    uphase.Name,

@@ -5,7 +5,7 @@ name: "victron-3em-bridge"
 CheckForUpdates: true
 
 logging:
-  level: info #loglevels are: "info,warn,debug,trace", remove to disable logging
+  level: debug #loglevels are: "info,warn,debug,trace", remove to disable logging
   interval: 10 #time in secods to write periodic logs. default: 3600
 
 mqtt:
