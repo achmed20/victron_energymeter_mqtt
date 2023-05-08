@@ -250,9 +250,11 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 				dbustools.Queue(ph.Phase.Current, "W", "/Ac/"+ph.Phase.Name+"/Current")
 			case "Exported":
 				dbustools.Queue(ph.Phase.Exported, "W", "/Ac/"+ph.Phase.Name+"/Energy/Forward")
+				validLineExported[ph.Phase.Name] = ph.Phase
 				// UpdateDbusGlobal()
 			case "Imported":
 				dbustools.Queue(ph.Phase.Imported, "W", "/Ac/"+ph.Phase.Name+"/Energy/Reverse")
+				validLineImported[ph.Phase.Name] = ph.Phase
 				// UpdateDbusGlobal()
 			}
 		}
